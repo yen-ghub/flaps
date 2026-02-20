@@ -219,6 +219,10 @@ def build_feature_matrix(df, max_values=None, expected_airlines=None, expected_r
     # Lag features
     df = compute_lag_features(df)
 
+    # Lag12 (same month last year)
+    df = df.copy()
+    df['delay_rate_lag12'] = df.groupby('airline_route')['delay_rate'].shift(12)
+
     # Weather transforms
     df, max_values = compute_weather_transforms(df, max_values=max_values)
 
@@ -240,16 +244,91 @@ def build_feature_matrix(df, max_values=None, expected_airlines=None, expected_r
                 df[col] = 0
         route_cols = expected_routes
 
-    # Drop rows with NaN lag features
-    df = df.dropna(subset=['delay_rate_lag1', 'delay_rate_lag2', 'delay_rate_gradient']).copy()
+    # Drop rows with NaN lag features (including lag12)
+    df = df.dropna(subset=[
+        'delay_rate_lag1', 'delay_rate_lag2', 'delay_rate_gradient',
+        'delay_rate_lag12',
+    ]).copy()
 
     # Assemble feature list (order matters — must match training)
     feature_names = (
         airline_cols
         + route_cols
         + ['month_sin', 'month_cos', 'delay_rate_lag1', 'sectors_scheduled']
-        + ['rainy_days_arr_exp', 'delay_rate_gradient',
+        + ['rainy_days_arr_exp', 'delay_rate_lag12', 'delay_rate_gradient',
            'temp_volatility_total_exp', 'extreme_weather_days_total']
+        + ['n_public_holidays_total', 'pct_school_holiday']
+    )
+
+    return {
+        'df': df,
+        'feature_names': feature_names,
+        'airline_cols': airline_cols,
+        'route_cols': route_cols,
+        'max_values': max_values,
+    }
+
+## Training data for forecasting ##
+# Need a new training matrix
+def build_forecasting_feature_matrix(df, max_values=None, expected_airlines=None,
+                                     expected_routes=None):
+    """
+    Feature engineering pipeline for the forecasting model (notebook 15a).
+
+    Key differences from build_feature_matrix():
+    - Adds delay_rate_lag12 (same month last year)
+    - Excludes same-month weather features (unavailable at prediction time)
+    - Drops rows missing lag12
+
+    Returns dict with same keys as build_feature_matrix().
+    """
+    # Add derived columns
+    df = add_derived_columns(df)
+
+    # Filter
+    df = filter_low_volume(df)
+    df = filter_anomalous_routes(df)
+
+    # Lag features (lag1, lag2, gradient)
+    df = compute_lag_features(df)
+
+    # Lag12 (same month last year)
+    df = df.copy()
+    df['delay_rate_lag12'] = df.groupby('airline_route')['delay_rate'].shift(12)
+
+    # Weather transforms (needed so columns exist in df, but not in feature list)
+    df, max_values = compute_weather_transforms(df, max_values=max_values)
+
+    # Cyclical month
+    df = compute_cyclical_month(df)
+
+    # One-hot encoding
+    df, airline_cols, route_cols = one_hot_encode(df)
+
+    # Ensure expected columns exist (for inference with unseen airlines/routes)
+    if expected_airlines is not None:
+        for col in expected_airlines:
+            if col not in df.columns:
+                df[col] = 0
+        airline_cols = expected_airlines
+    if expected_routes is not None:
+        for col in expected_routes:
+            if col not in df.columns:
+                df[col] = 0
+        route_cols = expected_routes
+
+    # Drop rows with NaN lag features (including lag12)
+    df = df.dropna(subset=[
+        'delay_rate_lag1', 'delay_rate_lag2', 'delay_rate_gradient',
+        'delay_rate_lag12',
+    ]).copy()
+
+    # Assemble feature list — no weather features for forecasting
+    feature_names = (
+        airline_cols
+        + route_cols
+        + ['month_sin', 'month_cos', 'delay_rate_lag1', 'sectors_scheduled']
+        + ['delay_rate_lag12', 'delay_rate_gradient']
         + ['n_public_holidays_total', 'pct_school_holiday']
     )
 

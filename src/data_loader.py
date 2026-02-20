@@ -31,10 +31,11 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-DATA_RAW = os.path.join(PROJECT_ROOT, 'data', 'raw')
-DATA_PROCESSED = os.path.join(PROJECT_ROOT, 'data', 'processed')
-MODELS_DIR = os.path.join(PROJECT_ROOT, 'models')
+PROJECT_ROOT    = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+DATA_RAW        = os.path.join(PROJECT_ROOT, 'data', 'raw')
+DATA_PROCESSED  = os.path.join(PROJECT_ROOT, 'data', 'processed')
+NOWCASTING_MODELS_DIR  = os.path.join(PROJECT_ROOT, 'models', 'nowcasting')
+FORECASTING_MODELS_DIR = os.path.join(PROJECT_ROOT, 'models', 'forecasting')
 
 CITY_MAPPING = {
     'Sydney': 'syd',
@@ -46,6 +47,10 @@ CITY_MAPPING = {
 }
 
 DEFAULT_CITIES = list(CITY_MAPPING.keys())
+
+BITRE_VERSION_RANGE = (9, 16)  # Try versions 9-15 (min, max_exclusive)
+# Range chosen to cover ~6 months of potential releases
+# Adjust if BITRE releases more/less frequently or skips version numbers
 
 # BOM FTP airport weather station paths (from notebook 1b)
 AIRPORT_FTP_PATHS = {
@@ -286,6 +291,9 @@ def download_bitre_data(save_path=None):
     """
     Download the latest BITRE flight data by trying recent months.
 
+    Tries both new version-numbered pattern (otp_time_series_master_current_N.xlsx)
+    and old date-based pattern (OTP_Time_Series_Master_Current_month_year.xlsx).
+
     Returns
     -------
     str or None : path to downloaded file, or None if download failed
@@ -294,16 +302,38 @@ def download_bitre_data(save_path=None):
         save_path = DATA_RAW
 
     base_url = "https://www.bitre.gov.au/sites/default/files/documents/"
-    current_date = datetime.now()
     headers = {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
     }
 
+    # Try new version-numbered pattern first (newest to oldest)
+    min_version, max_version = BITRE_VERSION_RANGE
+    for version in range(max_version - 1, min_version - 1, -1):
+        filename = f"otp_time_series_master_current_{version}.xlsx"
+        url = base_url + filename
+
+        print(f"Attempting to download: {filename}")
+        try:
+            response = requests.get(url, headers=headers, timeout=60)
+            if response.status_code == 200:
+                filepath = os.path.join(save_path, filename)
+                with open(filepath, 'wb') as f:
+                    f.write(response.content)
+                print(f"  Successfully downloaded: {filename}")
+                return filepath
+            else:
+                print(f"  Not found (HTTP {response.status_code})")
+        except requests.RequestException as e:
+            print(f"  Failed: {type(e).__name__}")
+
+    # Fall back to old date-based pattern
+    current_date = datetime.now()
     for months_back in range(1, 4):
         target_date = current_date - relativedelta(months=months_back)
         month_name = target_date.strftime("%B").lower()
         year = target_date.year
         filename = f"OTP_Time_Series_Master_Current_{month_name}_{year}.xlsx"
+
         url = base_url + filename
 
         print(f"Attempting to download: {filename}")
@@ -325,11 +355,25 @@ def download_bitre_data(save_path=None):
 
 
 def _get_latest_bitre_file():
-    """Find the most recent local BITRE Excel file."""
-    local_files = glob.glob(os.path.join(DATA_RAW, 'OTP_Time_Series_Master_Current_*.xlsx'))
+    """
+    Find the most recent local BITRE Excel file.
+
+    Searches for both old pattern (OTP_Time_Series_Master_Current_*.xlsx)
+    and new pattern (otp_time_series_master_current_*.xlsx).
+
+    Returns the most recently modified file.
+    """
+    # Search for both old and new patterns
+    pattern_old = os.path.join(DATA_RAW, 'OTP_Time_Series_Master_Current_*.xlsx')
+    pattern_new = os.path.join(DATA_RAW, 'otp_time_series_master_current_*.xlsx')
+
+    local_files = glob.glob(pattern_old) + glob.glob(pattern_new)
+
     if not local_files:
         raise FileNotFoundError("No BITRE data file found in data/raw/")
-    return max(local_files)
+
+    # Return the most recently modified file
+    return max(local_files, key=os.path.getmtime)
 
 
 # ===========================================================================
@@ -598,7 +642,7 @@ def load_models(models_dir=None):
     Returns dict with keys: ridge, rf_reg, logreg, rf_clf, xgb_clf, scaler, nn_reg, nn_clf
     """
     if models_dir is None:
-        models_dir = MODELS_DIR
+        models_dir = NOWCASTING_MODELS_DIR
 
     models = {}
     model_files = {
@@ -634,7 +678,7 @@ def load_models(models_dir=None):
 def load_metadata(models_dir=None):
     """Load metadata.json containing feature names, metrics, etc."""
     if models_dir is None:
-        models_dir = MODELS_DIR
+        models_dir = NOWCASTING_MODELS_DIR
     path = os.path.join(models_dir, 'metadata.json')
     with open(path, 'r') as f:
         return json.load(f)
@@ -644,6 +688,44 @@ def load_training_data(filename='ml_training_data_multiroute_hols.csv'):
     """Load the merged training data CSV."""
     path = os.path.join(DATA_PROCESSED, filename)
     return pd.read_csv(path)
+
+
+def load_forecasting_models(models_dir=None):
+    """
+    Load forecasting model artifacts from models/forecasting/.
+
+    Returns dict with keys: ridge, rf_reg, logreg, rf_clf, xgb_clf, scaler
+    (no neural network models for forecasting).
+    """
+    if models_dir is None:
+        models_dir = FORECASTING_MODELS_DIR
+
+    models = {}
+    model_files = {
+        'ridge': 'ridge_regressor.pkl',
+        'rf_reg': 'rf_regressor.pkl',
+        'logreg': 'logreg_classifier.pkl',
+        'rf_clf': 'rf_classifier.pkl',
+        'xgb_clf': 'xgb_classifier.pkl',
+        'scaler': 'scaler.pkl',
+    }
+    for key, filename in model_files.items():
+        path = os.path.join(models_dir, filename)
+        if os.path.exists(path):
+            models[key] = joblib.load(path)
+        else:
+            print(f"Warning: {path} not found")
+
+    return models
+
+
+def load_forecasting_metadata(models_dir=None):
+    """Load forecasting metadata.json."""
+    if models_dir is None:
+        models_dir = FORECASTING_MODELS_DIR
+    path = os.path.join(models_dir, 'metadata.json')
+    with open(path, 'r') as f:
+        return json.load(f)
 
 
 # ===========================================================================
