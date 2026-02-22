@@ -49,6 +49,16 @@ CITY_MAPPING = {
 DEFAULT_CITIES = list(CITY_MAPPING.keys())
 
 BITRE_VERSION_RANGE = (9, 16)  # Try versions 9-15 (min, max_exclusive)
+
+# Known filenames for BITRE Monthly Airline Performance data (load factor source).
+# The list is checked in order; the first existing file is used.
+# Add newer filenames to the front of this list when they become available.
+MONTHLY_AIRLINE_PERFORMANCE_CANDIDATES = [
+    'monthly-airline-performance-november-2025.xlsx',
+    'monthly-airline-performance-october-2025.xlsx',
+    'monthly-airline-performance-september-2025.xlsx',
+    'monthly-airline-performance-august-2025.xlsx',
+]
 # Range chosen to cover ~6 months of potential releases
 # Adjust if BITRE releases more/less frequently or skips version numbers
 
@@ -690,12 +700,89 @@ def load_training_data(filename='ml_training_data_multiroute_hols.csv'):
     return pd.read_csv(path)
 
 
+def load_load_factor_data(filepath=None):
+    """
+    Load market-wide monthly load factor from the BITRE Monthly Airline Performance Excel.
+
+    The load factor is the domestic passenger load factor (pax_load_factor_pct / 100),
+    aggregated across all airlines for each calendar month. It is used as an
+    additional feature in the forecasting models (lag1 + exponential transform).
+
+    Parameters
+    ----------
+    filepath : str or None
+        Path to the Excel file. If None, searches DATA_RAW for known filenames
+        listed in MONTHLY_AIRLINE_PERFORMANCE_CANDIDATES.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: ['year_month', 'load_factor'] where load_factor is in [0, 1].
+        COVID period (Apr–Dec 2020) is excluded. Rows before 2009 are excluded.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no Monthly Airline Performance file is found.
+    """
+    if filepath is None:
+        for candidate in MONTHLY_AIRLINE_PERFORMANCE_CANDIDATES:
+            path = os.path.join(DATA_RAW, candidate)
+            if os.path.exists(path):
+                filepath = path
+                break
+        if filepath is None:
+            raise FileNotFoundError(
+                "No Monthly Airline Performance file found in data/raw/. "
+                f"Expected one of: {MONTHLY_AIRLINE_PERFORMANCE_CANDIDATES}"
+            )
+
+    df_activity = pd.read_excel(filepath, sheet_name='Domestic airlines', header=None, skiprows=8)
+    df_activity.columns = [
+        'year', 'month_name', 'hours_flown', 'aircraft_km_flown_000', 'aircraft_departures',
+        'total_rev_pax_ud', 'freight_tonnes_ud', 'mail_tonnes_ud',
+        'total_rev_pax_tob', 'total_rev_pax_tob_inc_intl',
+        'freight_tonnes_tob', 'mail_tonnes_tob',
+        'total_rpk_000', 'pax_tonne_km_000', 'freight_tonne_km_000',
+        'mail_tonne_km_000', 'total_tonne_km_000',
+        'available_seat_km_000', 'available_tonne_km_000', 'available_seats_000',
+        'pax_load_factor_pct', 'weight_load_factor_pct',
+        'total_charter_pax_tob', 'charter_aircraft_departures',
+    ]
+
+    valid_months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'June',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    df_activity['year_numeric'] = pd.to_numeric(df_activity['year'], errors='coerce')
+    df_act = df_activity[
+        df_activity['year_numeric'].notna() &
+        df_activity['month_name'].isin(valid_months)
+    ].copy()
+
+    df_act['year'] = df_act['year_numeric'].astype(int)
+    df_act['month_name'] = df_act['month_name'].replace({'June': 'Jun'})
+    month_map = {'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12}
+    df_act['month_num'] = df_act['month_name'].map(month_map)
+    df_act['year_month'] = (
+        df_act['year'].astype(str) + '-' +
+        df_act['month_num'].astype(str).str.zfill(2)
+    )
+    df_act['load_factor'] = pd.to_numeric(df_act['pax_load_factor_pct'], errors='coerce') / 100.0
+
+    # Exclude COVID anomaly period
+    covid_mask = (df_act['year'] == 2020) & (df_act['month_num'] >= 4)
+    df_act = df_act[~covid_mask & (df_act['year'] >= 2009)].copy()
+
+    df_lf = df_act[['year_month', 'load_factor']].groupby('year_month', as_index=False).mean()
+    return df_lf
+
+
 def load_forecasting_models(models_dir=None):
     """
     Load forecasting model artifacts from models/forecasting/.
 
-    Returns dict with keys: ridge, rf_reg, logreg, rf_clf, xgb_clf, scaler
-    (no neural network models for forecasting).
+    Returns dict with keys: ridge, rf_reg, logreg, rf_clf, xgb_clf, scaler,
+    and optionally nn_reg, nn_clf (Keras neural network models).
     """
     if models_dir is None:
         models_dir = FORECASTING_MODELS_DIR
@@ -715,6 +802,18 @@ def load_forecasting_models(models_dir=None):
             models[key] = joblib.load(path)
         else:
             print(f"Warning: {path} not found")
+
+    # Load Keras neural network models if available
+    try:
+        from tensorflow import keras
+        nn_reg_path = os.path.join(models_dir, 'nn_regressor.keras')
+        nn_clf_path = os.path.join(models_dir, 'nn_classifier.keras')
+        if os.path.exists(nn_reg_path):
+            models['nn_reg'] = keras.models.load_model(nn_reg_path)
+        if os.path.exists(nn_clf_path):
+            models['nn_clf'] = keras.models.load_model(nn_clf_path)
+    except ImportError:
+        pass  # TensorFlow not available
 
     return models
 

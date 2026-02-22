@@ -168,6 +168,38 @@ def compute_cyclical_month(df):
     return df
 
 
+def compute_load_factor_features(df):
+    """
+    Compute load-factor lag and transform features for forecasting.
+
+    The load factor is a market-wide monthly figure (pax_load_factor_pct / 100)
+    from the BITRE Monthly Airline Performance data. It must already be merged
+    into df as the column 'load_factor' before calling this function.
+
+    Creates:
+      load_factor_lag1         - previous month's load factor (lag1 per airline-route)
+      load_factor_lag1_exp     - exp(load_factor_lag1)  [best variant in notebook 15d]
+      load_factor_lag1_log_inv - -log(1 - load_factor_lag1)  [alternative variant]
+
+    Parameters
+    ----------
+    df : DataFrame
+        Must contain 'airline_route' and 'load_factor' columns, sorted by airline_route
+        and time.
+
+    Returns
+    -------
+    DataFrame with new columns added.
+    """
+    df = df.copy()
+    df['load_factor_lag1'] = df.groupby('airline_route')['load_factor'].shift(1)
+    df['load_factor_lag1_exp'] = np.exp(df['load_factor_lag1'])
+    df['load_factor_lag1_log_inv'] = -np.log(
+        1 - df['load_factor_lag1'].clip(upper=0.99)
+    )
+    return df
+
+
 def one_hot_encode(df):
     """
     One-hot encode airline and route columns.
@@ -271,14 +303,30 @@ def build_feature_matrix(df, max_values=None, expected_airlines=None, expected_r
 ## Training data for forecasting ##
 # Need a new training matrix
 def build_forecasting_feature_matrix(df, max_values=None, expected_airlines=None,
-                                     expected_routes=None):
+                                     expected_routes=None, df_load_factor=None):
     """
-    Feature engineering pipeline for the forecasting model (notebook 15a).
+    Feature engineering pipeline for the forecasting model (notebook 15a/15d).
 
     Key differences from build_feature_matrix():
     - Adds delay_rate_lag12 (same month last year)
     - Excludes same-month weather features (unavailable at prediction time)
-    - Drops rows missing lag12
+    - Adds load_factor_lag1_exp if df_load_factor is provided (notebook 15d, LF Exp)
+    - Drops rows missing lag12 (and load_factor_lag1 if load factor data is provided)
+
+    Parameters
+    ----------
+    df : DataFrame
+        Raw merged training data (from ml_training_data_multiroute_hols.csv).
+    max_values : dict or None
+        Max values for weather exp transforms. None = compute from data.
+    expected_airlines : list or None
+        If provided, ensure these airline dummy columns exist (for inference).
+    expected_routes : list or None
+        If provided, ensure these route dummy columns exist (for inference).
+    df_load_factor : pd.DataFrame or None
+        Two-column DataFrame with ['year_month', 'load_factor'] from
+        load_load_factor_data(). If provided, load_factor_lag1_exp is added
+        to the feature set (the best variant from notebook 15d).
 
     Returns dict with same keys as build_feature_matrix().
     """
@@ -289,12 +337,22 @@ def build_forecasting_feature_matrix(df, max_values=None, expected_airlines=None
     df = filter_low_volume(df)
     df = filter_anomalous_routes(df)
 
+    # Merge load factor by year_month (market-wide, so same value for all routes/airlines)
+    #use_load_factor = df_load_factor is not None #commented out for now
+    use_load_factor = False
+    if use_load_factor:
+        df = df.merge(df_load_factor[['year_month', 'load_factor']], on='year_month', how='left')
+
     # Lag features (lag1, lag2, gradient)
     df = compute_lag_features(df)
 
     # Lag12 (same month last year)
     df = df.copy()
     df['delay_rate_lag12'] = df.groupby('airline_route')['delay_rate'].shift(12)
+
+    # Load factor features (lag1 + exp transform)
+    if use_load_factor:
+        df = compute_load_factor_features(df)
 
     # Weather transforms (needed so columns exist in df, but not in feature list)
     df, max_values = compute_weather_transforms(df, max_values=max_values)
@@ -317,13 +375,13 @@ def build_forecasting_feature_matrix(df, max_values=None, expected_airlines=None
                 df[col] = 0
         route_cols = expected_routes
 
-    # Drop rows with NaN lag features (including lag12)
-    df = df.dropna(subset=[
-        'delay_rate_lag1', 'delay_rate_lag2', 'delay_rate_gradient',
-        'delay_rate_lag12',
-    ]).copy()
+    # Drop rows with NaN lag features (including lag12 and, if used, load_factor_lag1)
+    required_lags = ['delay_rate_lag1', 'delay_rate_lag2', 'delay_rate_gradient', 'delay_rate_lag12']
+    if use_load_factor:
+        required_lags.append('load_factor_lag1')
+    df = df.dropna(subset=required_lags).copy()
 
-    # Assemble feature list — no weather features for forecasting
+    # Assemble feature list — no same-month weather features for forecasting
     feature_names = (
         airline_cols
         + route_cols
@@ -331,6 +389,8 @@ def build_forecasting_feature_matrix(df, max_values=None, expected_airlines=None
         + ['delay_rate_lag12', 'delay_rate_gradient']
         + ['n_public_holidays_total', 'pct_school_holiday']
     )
+    if use_load_factor:
+        feature_names = feature_names + ['load_factor_lag1_exp']
 
     return {
         'df': df,
