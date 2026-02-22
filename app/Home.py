@@ -11,98 +11,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import streamlit as st
 from src.data_loader import load_metadata
+from src.ui_theme import apply_theme
 
 st.set_page_config(
     page_title="FLAPS — Flight Delay Predictor",
     page_icon="✈️",
     layout="wide",
 )
-
-st.markdown(
-    """
-    <style>
-    :root {
-        --flaps-surface: #efeee9;
-        --flaps-card: #f8f7f3;
-        --flaps-text: #0d0d0d;
-        --flaps-muted: #5a5a5a;
-        --flaps-border: rgba(13, 13, 13, 0.25);
-        --flaps-accent: #0d0d0d;
-    }
-    .stApp {
-        background: var(--flaps-surface);
-        color: var(--flaps-text);
-        font-family: "Helvetica Neue", "Nimbus Sans L", "Liberation Sans", sans-serif;
-    }
-    h1, h2, h3 {
-        letter-spacing: -0.02em;
-        color: var(--flaps-text);
-    }
-    [data-testid="stDivider"] {
-        border-top: 1px solid var(--flaps-border);
-    }
-    .swiss-note {
-        max-width: 900px;
-        color: var(--flaps-muted);
-        font-size: 1rem;
-        line-height: 1.5;
-        margin-bottom: 1.2rem;
-    }
-    [data-testid="stMetric"] {
-        background: transparent;
-        border: 1px solid var(--flaps-border);
-        border-radius: 0;
-        padding: 0.8rem;
-        min-height: 132px;
-    }
-    [data-testid="stMetricLabel"] {
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 0.72rem;
-    }
-    [data-testid="stMetricValue"] {
-        white-space: normal;
-        overflow: visible;
-        text-overflow: clip;
-    }
-    [data-testid="stMetricDelta"] {
-        font-size: 0.8rem;
-    }
-    [data-testid="stAlert"] {
-        border-radius: 0;
-        border: 1px solid var(--flaps-border);
-    }
-    [data-testid="stSidebar"] {
-        background: var(--flaps-surface);
-        border-right: 1px solid var(--flaps-border);
-    }
-    [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
-        background: var(--flaps-surface);
-    }
-    [data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
-        border-radius: 0 !important;
-        color: var(--flaps-text);
-        background: transparent !important;
-        padding: 0.28rem 0.45rem;
-    }
-    [data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {
-        background: transparent !important;
-        text-decoration: underline;
-    }
-    [data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {
-        background: transparent !important;
-        font-weight: 600;
-        border-left: 2px solid var(--flaps-text);
-        padding-left: calc(0.45rem - 2px);
-    }
-    [data-testid="stSidebar"] hr {
-        border-color: var(--flaps-border);
-        margin: 0.9rem 0;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+apply_theme()
 
 
 @st.cache_data

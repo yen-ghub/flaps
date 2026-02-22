@@ -17,121 +17,26 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from src.data_loader import load_forecasting_metadata, load_forecasting_models, load_training_data
+from src.data_loader import (
+    load_forecasting_metadata,
+    load_forecasting_models,
+    load_load_factor_data,
+    load_training_data,
+)
+from src.ui_theme import apply_theme
 from src.feature_engineering import (
     add_derived_columns,
     compute_cyclical_month,
     compute_lag_features,
+    compute_load_factor_features,
     compute_weather_transforms,
     filter_anomalous_routes,
     filter_low_volume,
 )
 
 st.set_page_config(page_title="FLAPS — Prediction: Forecasting", page_icon="✈️", layout="wide")
+apply_theme()
 st.title("Forecasting")
-st.markdown(
-    """
-    <style>
-    :root {
-        --flaps-surface: #efeee9;
-        --flaps-card: #f8f7f3;
-        --flaps-text: #0d0d0d;
-        --flaps-muted: #5a5a5a;
-        --flaps-border: rgba(13, 13, 13, 0.25);
-        --flaps-accent: #0d0d0d;
-    }
-    .stApp {
-        background: var(--flaps-surface);
-        color: var(--flaps-text);
-        font-family: "Helvetica Neue", "Nimbus Sans L", "Liberation Sans", sans-serif;
-    }
-    h1, h2, h3 {
-        letter-spacing: -0.02em;
-        color: var(--flaps-text);
-    }
-    [data-testid="stDivider"] {
-        border-top: 1px solid var(--flaps-border);
-    }
-    .swiss-note {
-        max-width: 900px;
-        color: var(--flaps-muted);
-        font-size: 1rem;
-        line-height: 1.5;
-        margin-bottom: 1.2rem;
-    }
-    .swiss-section-kicker {
-        font-size: 0.82rem;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: var(--flaps-muted);
-        margin-bottom: 0.3rem;
-    }
-    [data-testid="stMetric"] {
-        background: transparent;
-        border: 1px solid var(--flaps-border);
-        border-radius: 0;
-        padding: 0.8rem;
-        min-height: 132px;
-    }
-    [data-testid="stMetricLabel"] {
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 0.72rem;
-    }
-    [data-testid="stMetricValue"] {
-        white-space: normal;
-        overflow: visible;
-        text-overflow: clip;
-    }
-    [data-testid="stMetricDelta"] {
-        font-size: 0.8rem;
-    }
-    [data-testid="stAlert"] {
-        border-radius: 0;
-        border: 1px solid var(--flaps-border);
-    }
-    [data-testid="stSidebar"] {
-        background: var(--flaps-surface);
-        border-right: 1px solid var(--flaps-border);
-    }
-    [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
-        background: var(--flaps-surface);
-    }
-    [data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
-        border-radius: 0 !important;
-        color: var(--flaps-text);
-        background: transparent !important;
-        padding: 0.28rem 0.45rem;
-    }
-    [data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {
-        background: transparent !important;
-        text-decoration: underline;
-    }
-    [data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {
-        background: transparent !important;
-        font-weight: 600;
-        border-left: 2px solid var(--flaps-text);
-        padding-left: calc(0.45rem - 2px);
-    }
-    [data-testid="stSidebar"] hr {
-        border-color: var(--flaps-border);
-        margin: 0.9rem 0;
-    }
-    [data-testid="stSidebar"] .stSelectbox label {
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 0.72rem;
-    }
-    [data-testid="stSidebar"] [data-baseweb="select"] > div {
-        border-radius: 0;
-        border: 1px solid var(--flaps-border);
-        background: var(--flaps-card);
-        min-height: 42px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 st.markdown(
     """
     <div class="swiss-note">
@@ -160,6 +65,15 @@ def get_metadata():
 
 
 @st.cache_data
+def get_load_factor():
+    """Load the market-wide monthly load factor data. Returns None if unavailable."""
+    try:
+        return load_load_factor_data()
+    except FileNotFoundError:
+        return None
+
+
+@st.cache_data
 def get_data():
     df = load_training_data()
     df = add_derived_columns(df)
@@ -173,6 +87,11 @@ def get_data():
     # Forecasting: add lag12
     df = df.copy()
     df['delay_rate_lag12'] = df.groupby('airline_route')['delay_rate'].shift(12)
+    # Load factor features (if data available)
+    df_lf = get_load_factor()
+    if df_lf is not None:
+        df = df.merge(df_lf[['year_month', 'load_factor']], on='year_month', how='left')
+        df = compute_load_factor_features(df)
     return df
 
 
@@ -191,6 +110,7 @@ df = get_data()
 
 # Check which models are available
 has_xgb = 'xgb_clf' in models
+has_nn = 'nn_reg' in models and 'nn_clf' in models
 
 # --- Sidebar inputs (route and airline only) ---
 st.sidebar.header("Forecasting Inputs")
@@ -221,7 +141,8 @@ if len(ar_data) == 0:
 
 # ── Helper: build feature vector and predict ──
 
-def build_features_and_predict(month_num, lag1, lag12, gradient, sectors, holidays_total, pct_school):
+def build_features_and_predict(month_num, lag1, lag12, gradient, sectors, holidays_total,
+                               pct_school, load_factor_lag1_exp=None):
     """Build the feature vector and return predictions from all models."""
     month_sin = np.sin(2 * np.pi * month_num / 12)
     month_cos = np.cos(2 * np.pi * month_num / 12)
@@ -247,6 +168,13 @@ def build_features_and_predict(month_num, lag1, lag12, gradient, sectors, holida
     feature_values['n_public_holidays_total'] = holidays_total
     feature_values['pct_school_holiday'] = pct_school
 
+    # Load factor (LF_exp) — only included if model was trained with it
+    if 'load_factor_lag1_exp' in feature_names:
+        # Use provided value; fall back to 1.0 (exp(0)) if unavailable
+        feature_values['load_factor_lag1_exp'] = (
+            float(load_factor_lag1_exp) if load_factor_lag1_exp is not None else 1.0
+        )
+
     X = np.array([[feature_values[f] for f in feature_names]])
 
     scaler = models['scaler']
@@ -257,10 +185,13 @@ def build_features_and_predict(month_num, lag1, lag12, gradient, sectors, holida
     logreg_proba = models['logreg'].predict_proba(X_scaled)[0][1]
     rf_clf_proba = models['rf_clf'].predict_proba(X)[0][1]
     xgb_proba = models['xgb_clf'].predict_proba(X)[0][1] if has_xgb else None
+    nn_reg_pred = float(models['nn_reg'].predict(X_scaled, verbose=0).flatten()[0]) if has_nn else None
+    nn_clf_proba = float(models['nn_clf'].predict(X_scaled, verbose=0).flatten()[0]) if has_nn else None
 
     return {
         'ridge': ridge_pred, 'rf': rf_pred,
         'logreg': logreg_proba, 'rf_clf': rf_clf_proba, 'xgb': xgb_proba,
+        'nn_reg': nn_reg_pred, 'nn_clf': nn_clf_proba,
     }
 
 
@@ -354,6 +285,17 @@ if can_predict_next:
     next_holidays = same_month_ly.iloc[0]['n_public_holidays_total']
     next_pct_school = same_month_ly.iloc[0]['pct_school_holiday']
 
+    # load_factor_lag1_exp for next month = exp(most recent available load_factor).
+    # We use the latest value from df_lf directly rather than latest_row['load_factor']
+    # because the training data may extend past the LF file's coverage (e.g. Dec 2025
+    # exists in training data but Nov 2025 is the latest in the LF Excel file).
+    next_lf_exp = None
+    df_lf = get_load_factor()
+    if df_lf is not None and len(df_lf) > 0:
+        latest_lf = df_lf.sort_values('year_month').iloc[-1]['load_factor']
+        if pd.notna(latest_lf):
+            next_lf_exp = float(np.exp(latest_lf))
+
     preds = build_features_and_predict(
         month_num=next_month_num,
         lag1=next_lag1,
@@ -362,12 +304,18 @@ if can_predict_next:
         sectors=next_sectors,
         holidays_total=next_holidays,
         pct_school=next_pct_school,
+        load_factor_lag1_exp=next_lf_exp,
     )
     next_all_proba = [preds['logreg'], preds['rf_clf']]
     if has_xgb:
         next_all_proba.append(preds['xgb'])
+    if has_nn and preds['nn_clf'] is not None:
+        next_all_proba.append(preds['nn_clf'])
     next_avg_proba = float(np.mean(next_all_proba))
-    next_ensemble_reg_pred = float(np.mean([preds['ridge'], preds['rf']]))
+    reg_preds = [preds['ridge'], preds['rf']]
+    if has_nn and preds['nn_reg'] is not None:
+        reg_preds.append(preds['nn_reg'])
+    next_ensemble_reg_pred = float(np.mean(reg_preds))
 
     st.markdown("**Forecasting Brief**")
     brief_cols = st.columns(4)
@@ -384,11 +332,13 @@ if can_predict_next:
 
     # Regression results (no actual, no error)
     st.markdown("**Delay Rate: Predicted**")
-    reg_cols = st.columns(2)
-    with reg_cols[0]:
-        st.metric("Ridge", f"{preds['ridge']:.1%}")
-    with reg_cols[1]:
-        st.metric("Random Forest", f"{preds['rf']:.1%}")
+    reg_items = [("Ridge", preds['ridge']), ("Random Forest", preds['rf'])]
+    if has_nn and preds['nn_reg'] is not None:
+        reg_items.append(("Neural Network", preds['nn_reg']))
+    reg_cols = st.columns(len(reg_items))
+    for i, (name, pred) in enumerate(reg_items):
+        with reg_cols[i]:
+            st.metric(name, f"{pred:.1%}")
 
     st.divider()
 
@@ -399,6 +349,8 @@ if can_predict_next:
     clf_items = [("Logistic", preds['logreg']), ("Random Forest", preds['rf_clf'])]
     if has_xgb:
         clf_items.append(("XGBoost", preds['xgb']))
+    if has_nn and preds['nn_clf'] is not None:
+        clf_items.append(("Neural Network", preds['nn_clf']))
 
     clf_cols = st.columns(len(clf_items))
     for i, (name, proba) in enumerate(clf_items):
@@ -486,6 +438,11 @@ else:
 
 selected_label = month_labels[selected_dt]
 
+# Get load_factor_lag1_exp from the historical row (pre-computed by get_data())
+past_lf_exp = None
+if 'load_factor_lag1_exp' in row.index and pd.notna(row.get('load_factor_lag1_exp')):
+    past_lf_exp = float(row['load_factor_lag1_exp'])
+
 # Predict
 past_preds = build_features_and_predict(
     month_num=selected_month,
@@ -495,8 +452,12 @@ past_preds = build_features_and_predict(
     sectors=row['sectors_scheduled'],
     holidays_total=row['n_public_holidays_total'],
     pct_school=row['pct_school_holiday'],
+    load_factor_lag1_exp=past_lf_exp,
 )
-past_ensemble_reg_pred = float(np.mean([past_preds['ridge'], past_preds['rf']]))
+reg_preds_past = [past_preds['ridge'], past_preds['rf']]
+if has_nn and past_preds['nn_reg'] is not None:
+    reg_preds_past.append(past_preds['nn_reg'])
+past_ensemble_reg_pred = float(np.mean(reg_preds_past))
 st.subheader("Performance Brief")
 perf_cols = st.columns(4)
 with perf_cols[0]:
@@ -514,6 +475,8 @@ st.divider()
 st.markdown("**Delay Rate: Predicted vs Actual**")
 
 reg_models = [("Ridge", past_preds['ridge']), ("Random Forest", past_preds['rf'])]
+if has_nn and past_preds['nn_reg'] is not None:
+    reg_models.append(("Neural Network", past_preds['nn_reg']))
 cols = st.columns(len(reg_models) + 1)
 
 for i, (name, pred) in enumerate(reg_models):
@@ -544,6 +507,8 @@ actual_label = "Yes" if actual_is_high else "No"
 clf_models = [("Logistic", past_preds['logreg']), ("Random Forest", past_preds['rf_clf'])]
 if has_xgb:
     clf_models.append(("XGBoost", past_preds['xgb']))
+if has_nn and past_preds['nn_clf'] is not None:
+    clf_models.append(("Neural Network", past_preds['nn_clf']))
 
 cols = st.columns(len(clf_models) + 1)
 
@@ -568,6 +533,8 @@ with cols[-1]:
 past_all_proba = [past_preds['logreg'], past_preds['rf_clf']]
 if has_xgb:
     past_all_proba.append(past_preds['xgb'])
+if has_nn and past_preds['nn_clf'] is not None:
+    past_all_proba.append(past_preds['nn_clf'])
 render_gauge(np.mean(past_all_proba))
 
 # Context
