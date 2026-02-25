@@ -113,13 +113,8 @@ apply_theme(
 )
 st.title("Model Architecture")
 st.markdown(
-    """
-    <div class="swiss-note">
-        Architecture-only view of trained models. Visuals are lightweight and do not require
-        Graphviz.
-    </div>
-    """,
-    unsafe_allow_html=True,
+    "This page shows the architectures of the top 3 best performing machine learning models. "
+    "Please select between the Nowcasting and Forecasting models using the selection below."
 )
 
 
@@ -297,7 +292,7 @@ except Exception as exc:
 
 st.divider()
 st.subheader("2. XGBoost Classification")
-st.caption("Lightweight architecture view (no per-tree inspection).")
+#st.caption("Lightweight architecture view (no per-tree inspection).")
 
 try:
     xgb_path = os.path.join(models_dir, "xgb_classifier.pkl")
@@ -340,7 +335,7 @@ except Exception as exc:
 
 st.divider()
 st.subheader("3. Neural Network Models")
-st.caption("Layer stack diagrams and architecture tables (no Graphviz).")
+#st.caption("Layer stack diagrams and architecture tables (no Graphviz).")
 
 try:
     nn_reg_path = os.path.join(models_dir, "nn_regressor.keras")

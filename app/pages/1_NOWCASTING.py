@@ -27,16 +27,65 @@ from src.feature_engineering import (
 
 st.set_page_config(page_title="FLAPS — Prediction: Nowcasting", page_icon="✈️", layout="wide")
 apply_theme()
-st.title("Nowcasting")
 st.markdown(
     """
-    <div class="swiss-note">
-        Nowcasting uses data available up to and including the prediction month, which allows
-        same-month context to be incorporated. Select a route, airline, and month to compare model
-        predictions against observed outcomes.
-    </div>
+    <style>
+    [data-testid="stMetric"]:has([data-testid="stMetricDelta"]) {
+        border-left: 3px solid #b07d2e;
+        padding-left: calc(0.8rem - 2px);
+    }
+    div[class*="e12zf7d53"] {
+        border-width: 3px !important;
+        border-radius: 0 !important;
+        border-color: rgba(13, 13, 13, 0.25) !important;
+        padding-bottom: 0.6rem !important;
+    }
+    .stSelectbox label,
+    .stSelectbox label * {
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+        font-size: 0.9rem !important;
+        font-weight: 400 !important;
+    }
+    .stSelectbox [data-baseweb="select"] div[class*="ValueContainer"] div,
+    .stSelectbox [data-baseweb="select"] div[class*="singleValue"],
+    .stSelectbox [data-baseweb="select"] div[class*="placeholder"] {
+        font-size: 0.72rem !important;
+    }
+    .actual-box {
+        background-color: #e8e6df;
+        border: 1px solid rgba(13, 13, 13, 0.25);
+        border-radius: 0;
+        padding: 0.8rem;
+        min-height: 132px;
+        box-sizing: border-box;
+    }
+    .actual-box .label {
+        font-family: inherit;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.875rem;
+        color: rgb(49, 51, 63);
+        font-weight: 400;
+        margin-bottom: 0.5rem;
+    }
+    .actual-box .value {
+        font-family: inherit;
+        font-size: clamp(1.5rem, 2.5vw, 2.5rem);
+        font-weight: 400;
+        color: rgb(49, 51, 63);
+        line-height: 1;
+    }
+    </style>
     """,
     unsafe_allow_html=True,
+)
+st.title("NOWCASTING")
+st.markdown(
+    "Nowcasting predicts the delay rate by using real-time data (i.e. up to and including the selected month itself). "
+)
+st.markdown(
+    "_*The actual delay rate is shown for comparison purposes only and is not used in making any predictions._"
 )
 
 # Streamlit re-runs the entire script with every interaction (any click, dropdown, slider, etc.)
@@ -70,60 +119,69 @@ df = get_data()
 has_nn = 'nn_reg' in models and 'nn_clf' in models  # neural network
 has_xgb = 'xgb_clf' in models                       # XGBoost
 
-# --- Sidebar inputs ---
-# Create a sidebar for user input (inference)
-st.sidebar.header("Nowcasting Inputs")
+# --- Input Selection ---
+st.divider()
+st.subheader("Select a Flight")
 
-# Route selection dropdown (show as "City -> City")
 valid_routes = metadata['valid_routes']
 route_labels = {r: r.replace('_', ' \u2192 ') for r in valid_routes}
-selected_route = st.sidebar.selectbox(
-    "Route",
-    options=valid_routes,
-    format_func=lambda r: route_labels[r],
-    index=19,
-)
 
-# Airline selection dropdown (filtered to those operating on the selected route)
-route_df = df[df['route'] == selected_route]
-route_airlines = sorted(route_df['airline'].unique().tolist())
-selected_airline = st.sidebar.selectbox("Airline", options=route_airlines)
+with st.container(border=True):
+    brief_cols = st.columns(3)
 
-# Combile the airline-route selections and filter data
-airline_route = f"{selected_airline}_{selected_route}"
-ar_data = df[df['airline_route'] == airline_route].sort_values('year_month_dt')
+    # Route selectbox — first column
+    with brief_cols[0]:
+        selected_route = st.selectbox(
+            "Route",
+            options=valid_routes,
+            format_func=lambda r: route_labels[r],
+            index=19,
+        )
 
-# Handle error when there is no available data for inference
-if len(ar_data) == 0:
-    st.warning("No historical data available for this airline-route combination.")
-    st.stop()
+    # Airline options depend on selected route
+    route_df = df[df['route'] == selected_route]
+    route_airlines = sorted(route_df['airline'].unique().tolist())
 
-# Year-month selection: manually limit to the last 12 months of the complete date range
-# We need rows that have lag1 available (not NaN) so predictions can be made
-ar_with_lag = ar_data.dropna(subset=['delay_rate_lag1'])
-if len(ar_with_lag) == 0:
-    st.warning("Insufficient data to compute lag features for this airline-route.")
-    st.stop()
+    # Airline selectbox — second column
+    with brief_cols[1]:
+        selected_airline = st.selectbox("Airline", options=route_airlines)
 
-# Determine the last 12 calendar months from the full dataset (before any split)
-all_months_sorted = sorted(df['year_month_dt'].unique())
-last_12_cutoff = all_months_sorted[-12] if len(all_months_sorted) >= 12 else all_months_sorted[0]
-available_months = sorted(ar_with_lag[
-    ar_with_lag['year_month_dt'] >= last_12_cutoff
-]['year_month_dt'].unique().tolist())
+    # Combine the airline-route selections and filter data
+    airline_route = f"{selected_airline}_{selected_route}"
+    ar_data = df[df['airline_route'] == airline_route].sort_values('year_month_dt')
 
-if len(available_months) == 0:
-    st.warning("No data available for this airline-route in the last 12 months.")
-    st.stop()
+    # Handle error when there is no available data for inference
+    if len(ar_data) == 0:
+        st.warning("No historical data available for this airline-route combination.")
+        st.stop()
 
-month_labels = {dt: pd.Timestamp(dt).strftime('%B %Y') for dt in available_months}
+    # Year-month selection: manually limit to the last 12 months of the complete date range
+    # We need rows that have lag1 available (not NaN) so predictions can be made
+    ar_with_lag = ar_data.dropna(subset=['delay_rate_lag1'])
+    if len(ar_with_lag) == 0:
+        st.warning("Insufficient data to compute lag features for this airline-route.")
+        st.stop()
 
-# Month selection dropdown
-selected_dt = st.sidebar.selectbox(
-    "Prediction Month",
-    options=list(reversed(available_months)),
-    format_func=lambda dt: month_labels[dt],
-)
+    # Determine the last 12 calendar months from the full dataset (before any split)
+    all_months_sorted = sorted(df['year_month_dt'].unique())
+    last_12_cutoff = all_months_sorted[-12] if len(all_months_sorted) >= 12 else all_months_sorted[0]
+    available_months = sorted(ar_with_lag[
+        ar_with_lag['year_month_dt'] >= last_12_cutoff
+    ]['year_month_dt'].unique().tolist())
+
+    if len(available_months) == 0:
+        st.warning("No data available for this airline-route in the last 12 months.")
+        st.stop()
+
+    month_labels = {dt: pd.Timestamp(dt).strftime('%B %Y') for dt in available_months}
+
+    # Month selectbox — third column
+    with brief_cols[2]:
+        selected_dt = st.selectbox(
+            "Month",
+            options=list(reversed(available_months)),
+            format_func=lambda dt: month_labels[dt],
+        )
 
 # --- Start collecting features to assemble input X ---
 matched = ar_with_lag[ar_with_lag['year_month_dt'] == selected_dt]
@@ -158,9 +216,6 @@ if len(lag12_match) > 0:
 else:
     # Fallback: use lag1 (degrades performance but allows prediction)
     lag12_value = lag1_value
-
-st.sidebar.divider()
-st.sidebar.markdown(f"**Previous month delay rate (lag1):** {lag1_value:.1%}")
 
 # --- Build feature vector ---
 month_sin = np.sin(2 * np.pi * selected_month / 12)
@@ -217,7 +272,6 @@ selected_label = month_labels[selected_dt]
 reg_models = [("Ridge", ridge_pred), ("Random Forest", rf_pred)]
 if has_nn:
     reg_models.append(("Neural Network", nn_reg_pred))
-ensemble_reg_pred = float(np.mean([pred for _, pred in reg_models]))
 
 clf_models = [("Logistic", logreg_proba), ("Random Forest", rf_clf_proba)]
 if has_xgb:
@@ -228,31 +282,22 @@ if has_nn:
 avg_proba = float(np.mean([proba for _, proba in clf_models]))
 
 # --- Display results ---
-st.subheader("Nowcasting Brief")
-brief_cols = st.columns(4)
-
-with brief_cols[0]:
-    st.metric("Route", route_labels[selected_route])
-with brief_cols[1]:
-    st.metric("Airline", selected_airline)
-with brief_cols[2]:
-    st.metric("Prediction Month", selected_label)
-with brief_cols[3]:
-    st.metric("Ensemble Delay Rate", f"{ensemble_reg_pred:.1%}")
-
 st.divider()
 
-st.subheader("Delay Rate: Predicted vs Actual")
+st.subheader("Predictions")
+
+st.markdown("**Delay rate**")
+st.caption("Percentage of flights in the selected month are delayed")
 
 n_reg_cols = len(reg_models) + 1  # +1 for actual
 cols = st.columns(n_reg_cols)
 
-# Displav regression predictions in columns
+# Display regression predictions in columns
 for i, (name, pred) in enumerate(reg_models):
     with cols[i]:
         err = pred - actual_delay_rate
         st.metric(
-            name,
+            f"Model: {name}",
             f"{pred:.1%}",
             delta=f"{err:+.1%} error",
             delta_color="inverse",
@@ -260,16 +305,18 @@ for i, (name, pred) in enumerate(reg_models):
 
 # The actual delay rate from BITRE
 with cols[-1]:
-    st.metric(
-        "Actual Delay Rate",
-        f"{actual_delay_rate:.1%}",
-        help=f"Observed delay rate for {selected_label}",
+    st.markdown(
+        f'<div class="actual-box">'
+        f'<div class="label">Actual Delay Rate*</div>'
+        f'<div class="value">{actual_delay_rate:.1%}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
     )
 
 st.divider()
 
-st.subheader("High-Delay Probability: Predicted vs Actual")
-st.caption("Probability that the delay rate exceeds 25%")
+st.markdown("**High-Delay Month Probability**")
+st.caption("Probability that more than 25%% of the flights in the selected month are delayed")
 
 actual_label = "Yes" if actual_is_high else "No"
 
@@ -281,17 +328,19 @@ for i, (name, proba) in enumerate(clf_models):
     with cols[i]:
         correct = (proba >= 0.5) == bool(actual_is_high)
         st.metric(
-            name,
+            f"Model: {name}",
             f"{proba:.1%}",
             delta="Matches actual" if correct else "Mismatch",
             delta_color="normal" if correct else "inverse",
         )
 
 with cols[-1]:
-    st.metric(
-        "Actual High-Delay",
-        actual_label,
-        help=f"delay_rate = {actual_delay_rate:.1%}, threshold = 25%",
+    st.markdown(
+        f'<div class="actual-box">'
+        f'<div class="label">Actual High-Delay Month</div>'
+        f'<div class="value">{actual_label}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
     )
 
 # Gauge chart for average classifier prediction
@@ -330,14 +379,14 @@ st.divider()
 st.subheader("Prediction Context")
 context_col1, context_col2 = st.columns(2)
 with context_col1:
-    st.write(f"**Month:** {selected_label}")
-    st.write(f"**Previous month delay rate (lag1):** {lag1_value:.1%}")
-    st.write(f"**Same month last year (lag12):** {lag12_value:.1%}")
+    st.write(f"**Selected month:** {selected_label}")
+    st.write(f"**Delay rate 1 month ago:** {lag1_value:.1%}")
+    st.write(f"**Delay rate 12 months ago:** {lag12_value:.1%}")
     st.write(
         f"**Delay rate gradient:** {gradient:+.1%} "
         f"({'improving' if gradient < 0 else 'worsening' if gradient > 0 else 'stable'})"
     )
 with context_col2:
     st.write(f"**Scheduled sectors:** {int(row['sectors_scheduled'])}")
-    st.write(f"**Rainy days at arrival (exp):** {row['rainy_days_arr_exp']:.2f}")
-    st.write(f"**Extreme weather days (total):** {row['extreme_weather_days_total']:.1f}")
+    st.write(f"**Number of rainy days at arrival airport (exponential):** {row['rainy_days_arr_exp']:.2f}")
+    st.write(f"**Number of days with extreme weather:** {row['extreme_weather_days_total']:.1f}")
