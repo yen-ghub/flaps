@@ -82,7 +82,7 @@ st.markdown(
 )
 st.title("NOWCASTING")
 st.markdown(
-    "Nowcasting predicts the delay rate by using real-time data (i.e. up to and including the selected month itself). "
+    "NOWCASTING predicts the delay rate by using real-time data (i.e. up to and including the selected month itself). "
 )
 st.markdown(
     "_*The actual delay rate is shown for comparison purposes only and is not used in making any predictions._"
@@ -183,6 +183,8 @@ with st.container(border=True):
             format_func=lambda dt: month_labels[dt],
         )
 
+st.markdown(f"Latest available data: **{pd.Timestamp(df['year_month_dt'].max()).strftime('%B %Y')}**")
+
 # --- Start collecting features to assemble input X ---
 matched = ar_with_lag[ar_with_lag['year_month_dt'] == selected_dt]
 if len(matched) == 0:
@@ -269,13 +271,13 @@ nn_clf_proba = models['nn_clf'].predict(X_scaled, verbose=0).flatten()[0] if has
 selected_label = month_labels[selected_dt]
 
 # Assemble model outputs for both brief summary and detailed sections
-reg_models = [("Ridge", ridge_pred), ("Random Forest", rf_pred)]
+reg_models = [("Ridge ★", ridge_pred), ("Random Forest", rf_pred)]
 if has_nn:
     reg_models.append(("Neural Network", nn_reg_pred))
 
 clf_models = [("Logistic", logreg_proba), ("Random Forest", rf_clf_proba)]
 if has_xgb:
-    clf_models.append(("XGBoost", xgb_proba))
+    clf_models.insert(0, (" XGBoost ★", xgb_proba))
 if has_nn:
     clf_models.append(("Neural Network", nn_clf_proba))
 
@@ -287,7 +289,7 @@ st.divider()
 st.subheader("Predictions")
 
 st.markdown("**Delay rate**")
-st.caption("Percentage of flights in the selected month are delayed")
+st.caption("Percentage of flights in the selected month are delayed.")
 
 n_reg_cols = len(reg_models) + 1  # +1 for actual
 cols = st.columns(n_reg_cols)
@@ -316,7 +318,7 @@ with cols[-1]:
 st.divider()
 
 st.markdown("**High-Delay Month Probability**")
-st.caption("Probability that more than 25%% of the flights in the selected month are delayed")
+st.caption("Probability that more than 25%% of the flights in the selected month are delayed.")
 
 actual_label = "Yes" if actual_is_high else "No"
 

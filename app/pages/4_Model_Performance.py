@@ -72,10 +72,9 @@ st.markdown(
 
 COL = {
     "actual": "#0d0d0d",
-    "ridge": "#1f4e79",
-    "ridge_forecast": "#7a3e1a",
-    "rf": "#2f6b3c",
-    "nn": "#6b4a8b",
+    "ridge": "#377eb8",              # ColorBrewer Set1 blue
+    "rf": "#4daf4a",                 # ColorBrewer Set1 green
+    "nn": "#984ea3",                 # ColorBrewer Set1 purple
     "xgb": "#8b3f2f",
     "baseline_mean": "#9a9a9a",
     "baseline_lag1": "#666666",
@@ -94,7 +93,8 @@ def style_plot(fig, *, height=420):
         paper_bgcolor=COL["bg"],
         plot_bgcolor=COL["bg"],
         font=dict(color=COL["actual"], size=16),
-        margin=dict(l=20, r=20, t=58, b=28),
+        title_font=dict(size=20),
+        margin=dict(l=20, r=20, t=64, b=28),
         height=height,
         legend=dict(bgcolor="rgba(0,0,0,0)", borderwidth=0, font=dict(size=16)),
     )
@@ -189,14 +189,30 @@ ffull_preds = get_forecasting_full_predictions() if os.path.exists(
     os.path.join(FORECASTING_MODELS_DIR, 'full_predictions.json')
 ) else None
 
+st.divider()
+
 # ---- 1. Summary Table ----
-st.subheader("1. Performance Summary")
+st.subheader("1. Performance Metrics Summary")
 
-st.markdown("**Nowcasting Models** (same-month weather features available)")
+st.markdown("**R²**: measures how well the model explains variation in delay rates: a score of 1.0 is perfect, 0.0 means no better than guessing the average.  \n"
+            "For the models presented here, R² is about 0.5, which means the models explain roughly half the month-to-month variation in delays."
+            )
 
-col1, col2 = st.columns(2)
+st.markdown("**MAE** (Mean Absolute Error) and **RMSE** (Root-Mean-Square Error): both measure prediction accuracy in percentage points.  \n"
+            "MAE (about 6%) is the average error size, while RMSE (about 8%) penalizes larger errors more.  \n"
+            "Here, RMSE is about 35%  higher than MAE, which indicates the majority of the errors are small.   \n"
+            )
+st.markdown("**Precision**: of all the _predicted_ high-delay months, how often is it correct?  \n"
+            "**Recall**: of all the _actual_ high-delay months, how many does the model correctly identify?  \n"
+            "**F1**: a score that captures the balance of precision and recall.  \n"
+            )
+st.markdown("**AUC**: how well does the model rank high-delay months higher than normal-delay months?")
+st.space('small')
 
-with col1:
+col_now, col_fore = st.columns(2)
+
+with col_now:
+    st.markdown("##### NOWCASTING")
     st.markdown("**Regression (Test Set)**")
     reg_data = []
     for name, key in [("Ridge", "ridge"), ("Random Forest", "rf_reg"), ("Neural Network", "nn_reg")]:
@@ -209,8 +225,7 @@ with col1:
                 'MAE': f"{m['MAE']:.4f}",
             })
     render_swiss_table(reg_data, columns=["Model", "R²", "RMSE", "MAE"])
-
-with col2:
+    st.space('small')
     st.markdown("**Classification (Test Set)**")
     clf_data = []
     for name, key in [("Logistic", "logreg"), ("Random Forest", "rf_clf"), ("XGBoost", "xgb_clf"), ("Neural Network", "nn_clf")]:
@@ -224,18 +239,14 @@ with col2:
                 'Recall': f"{m['Recall']:.4f}",
             })
     render_swiss_table(clf_data, columns=["Model", "F1", "AUC", "Precision", "Recall"])
+    st.caption(
+        f"Train: {metadata['split']['n_train']} samples ({metadata['split']['train']}) | "
+        f"Val: {metadata['split']['n_val']} samples ({metadata['split']['val']}) | "
+        f"Test: {metadata['split']['n_test']} samples ({metadata['split']['test']})"
+    )
 
-st.caption(
-    f"Train: {metadata['split']['n_train']} samples ({metadata['split']['train']}) | "
-    f"Val: {metadata['split']['n_val']} samples ({metadata['split']['val']}) | "
-    f"Test: {metadata['split']['n_test']} samples ({metadata['split']['test']})"
-)
-
-st.markdown("**Forecasting Models** (next-month prediction using only lagged features)")
-
-col1, col2 = st.columns(2)
-
-with col1:
+with col_fore:
+    st.markdown("##### FORECASTING")
     st.markdown("**Regression (Test Set)**")
     freg_data = []
     for name, key in [("Ridge", "ridge"), ("Random Forest", "rf_reg"), ("Neural Network", "nn_reg")]:
@@ -248,8 +259,7 @@ with col1:
                 'MAE': f"{m['MAE']:.4f}",
             })
     render_swiss_table(freg_data, columns=["Model", "R²", "RMSE", "MAE"])
-
-with col2:
+    st.space('small')
     st.markdown("**Classification (Test Set)**")
     fclf_data = []
     for name, key in [("Logistic", "logreg"), ("Random Forest", "rf_clf"), ("XGBoost", "xgb_clf"), ("Neural Network", "nn_clf")]:
@@ -263,17 +273,29 @@ with col2:
                 'Recall': f"{m['Recall']:.4f}",
             })
     render_swiss_table(fclf_data, columns=["Model", "F1", "AUC", "Precision", "Recall"])
+    # st.caption(
+    #     f"Train: {fmetadata['split']['n_train']} samples ({fmetadata['split']['train']}) | "
+    #     f"Val: {fmetadata['split']['n_val']} samples ({fmetadata['split']['val']}) | "
+    #     f"Test: {fmetadata['split']['n_test']} samples ({fmetadata['split']['test']})"
+    # )
 
-st.caption(
-    f"Train: {fmetadata['split']['n_train']} samples ({fmetadata['split']['train']}) | "
-    f"Val: {fmetadata['split']['n_val']} samples ({fmetadata['split']['val']}) | "
-    f"Test: {fmetadata['split']['n_test']} samples ({fmetadata['split']['test']})"
-)
 
 st.divider()
 
+
+# ________________________________
 # ---- 2. Baseline Comparison ----
-st.subheader("2. Baseline Comparison")
+st.subheader("2. Comparison vs Naive Baseline")
+
+st.markdown("""
+            A naive baseline provides a benchmark for the minimum performance expected for this task.
+
+            If a trained model cannot outperform this benchmark, the added complexity cannot be justified.
+
+            Here, the naive baseline is defined as: assuming the the next month's delay is equal the same as this month's (_Lag1 Baseline_).
+            
+            The results suggest the machine learning models offer meaningful improvements beyond the naive approach.
+            """)
 
 # Nowcasting
 baseline_lag1 = metadata['baseline_lag1_r2']
@@ -281,7 +303,7 @@ ridge_r2 = metadata['metrics']['ridge']['R2']
 rf_r2 = metadata['metrics']['rf_reg']['R2']
 nn_r2 = metadata['metrics'].get('nn_reg', {}).get('R2')
 
-st.markdown("**Nowcasting Models**")
+#st.markdown("**Nowcasting Models**")
 fig = go.Figure()
 models_names = ['Lag1 Baseline', 'Ridge', 'Random Forest']
 r2_values = [baseline_lag1, ridge_r2, rf_r2]
@@ -300,18 +322,10 @@ fig.add_trace(go.Bar(
 ))
 fig.update_layout(
     yaxis_title="R²",
-    title="Regression R² vs Naive Baselines (Nowcasting)",
+    title="NOWCASTING",
     yaxis=dict(range=[0, max(r2_values) * 1.2]),
 )
 style_plot(fig, height=400)
-st.plotly_chart(fig, use_container_width=True)
-
-improvement = ridge_r2 - baseline_lag1
-st.markdown(
-    f"The lag1 baseline achieves R² = {baseline_lag1:.3f}. "
-    f"The Ridge model improves by **+{improvement:.3f}**, demonstrating that weather, "
-    f"holidays, momentum, and seasonal encoding add predictive value beyond trivial persistence."
-)
 
 # Forecasting
 f_baseline_lag1 = fmetadata['baseline_lag1_r2']
@@ -319,7 +333,6 @@ f_ridge_r2 = fmetadata['metrics']['ridge']['R2']
 f_rf_r2 = fmetadata['metrics']['rf_reg']['R2']
 f_nn_r2 = fmetadata['metrics'].get('nn_reg', {}).get('R2')
 
-st.markdown("**Forecasting Models**")
 fig_f = go.Figure()
 f_models_names = ['Lag1 Baseline', 'Ridge', 'Random Forest']
 f_r2_values = [f_baseline_lag1, f_ridge_r2, f_rf_r2]
@@ -338,23 +351,40 @@ fig_f.add_trace(go.Bar(
 ))
 fig_f.update_layout(
     yaxis_title="R²",
-    title="Regression R² vs Naive Baselines (Forecasting)",
+    title="FORECASTING",
     yaxis=dict(range=[0, max(f_r2_values) * 1.2]),
 )
 style_plot(fig_f, height=400)
-st.plotly_chart(fig_f, use_container_width=True)
 
-f_improvement = f_ridge_r2 - f_baseline_lag1
-st.markdown(
-    f"The lag1 baseline achieves R² = {f_baseline_lag1:.3f}. "
-    f"The Ridge model improves by **+{f_improvement:.3f}**, demonstrating that lagged features, "
-    f"holidays, momentum, and seasonal encoding add predictive value beyond trivial persistence."
-)
+col_now, col_fore = st.columns(2)
+with col_now:
+    st.plotly_chart(fig, use_container_width=True)
+    improvement = ridge_r2 - baseline_lag1
+    # st.markdown(
+    #     f"The lag1 baseline achieves R² = {baseline_lag1:.3f}. "
+    #     f"The Ridge model improves by **+{improvement:.3f}**, demonstrating that weather, "
+    #     f"holidays, momentum, and seasonal encoding add predictive value beyond trivial persistence."
+    # )
+with col_fore:
+    st.plotly_chart(fig_f, use_container_width=True)
+    f_improvement = f_ridge_r2 - f_baseline_lag1
+    # st.markdown(
+    #     f"The lag1 baseline achieves R² = {f_baseline_lag1:.3f}. "
+    #     f"The Ridge model improves by **+{f_improvement:.3f}**, demonstrating that lagged features, "
+    #     f"holidays, momentum, and seasonal encoding add predictive value beyond trivial persistence."
+    # )
 
 st.divider()
 
+# ____________________________________
 # ---- 3. Route-Level Performance ----
 st.subheader("3. Route-Level Performance")
+
+st.markdown("""
+            The predictive performance of the models varies depending on the route.
+            
+            The chart below breaks down the accuracy of the Ridge model for each flight route.
+            """)
 
 # Build nowcasting route DataFrame, sorted by Ridge R²
 route_data = []
@@ -379,57 +409,46 @@ for route, m in fmetadata['route_metrics'].items():
 froute_df = pd.DataFrame(froute_data)
 froute_df = froute_df.set_index('Route').reindex(route_df['Route']).reset_index()
 
-fig = make_subplots(rows=1, cols=2, subplot_titles=["Nowcasting R² by Route", "Forecasting R² by Route"])
-
-# Nowcasting: Ridge + Lag1 overlay
+fig = go.Figure()
 fig.add_trace(go.Bar(
     y=route_df['Route'], x=route_df['Ridge R²'],
-    orientation='h', name='Ridge (Nowcast)',
+    orientation='h', name='NOWCASTING',
     marker_color=COL["ridge"],
-), row=1, col=1)
-fig.add_trace(go.Bar(
-    y=route_df['Route'], x=route_df['Lag1 R²'],
-    orientation='h', name='Lag1 Baseline',
-    marker_color=COL["baseline_lag1"], opacity=0.55,
-), row=1, col=1)
-
-# Forecasting: Ridge + Lag1 overlay
+))
 fig.add_trace(go.Bar(
     y=froute_df['Route'], x=froute_df['Ridge R²'],
-    orientation='h', name='Ridge (Forecast)',
-    marker_color=COL["ridge_forecast"],
-    showlegend=True,
-), row=1, col=2)
-fig.add_trace(go.Bar(
-    y=froute_df['Route'], x=froute_df['Lag1 R²'],
-    orientation='h', name='Lag1 Baseline',
-    marker_color=COL["baseline_lag1"], opacity=0.55,
-    showlegend=False,
-), row=1, col=2)
-
-fig.update_layout(height=600, barmode='overlay')
-fig.update_xaxes(title_text="R²", row=1, col=1)
-fig.update_xaxes(title_text="R²", row=1, col=2)
-fig.update_yaxes(showticklabels=False, row=1, col=2)
+    orientation='h', name='FORECASTING',
+    marker_color='#ff7f00',
+))
+fig.update_layout(
+    barmode='group',
+    bargap=0.35,
+    bargroupgap=0.08,
+    title="Ridge R² by Route",
+    xaxis_title="R²",
+)
 style_plot(fig, height=600)
-st.plotly_chart(fig, use_container_width=True)
+col_chart, _ = st.columns([2, 1])
+with col_chart:
+    st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
 
-# ---- 4. Actual vs Predicted ----
-st.subheader("4. Actual vs Predicted (Test Set)")
+#__________________________________
+# ---- 4. Actual vs Prediction ----
+st.subheader("4. Actual vs Prediction")
 
 avp_view = st.radio(
-    "Model type", ["Nowcasting", "Forecasting"],
+    "Model type", ["NOWCASTING", "FORECASTING"],
     horizontal=True, label_visibility="collapsed",
     key="avp_view",
 )
 
-_is_nowcast = avp_view == "Nowcasting"
+_is_nowcast = avp_view == "NOWCASTING"
 _preds = preds if _is_nowcast else fpreds
 _full_preds = full_preds if _is_nowcast else ffull_preds
 _meta = metadata if _is_nowcast else fmetadata
-_ridge_color = COL["ridge"] if _is_nowcast else COL["ridge_forecast"]
+_ridge_color = COL["ridge"]
 
 y_true = np.array(_preds['y_true_reg'])
 ridge_preds = np.array(_preds['ridge_pred'])
@@ -442,7 +461,8 @@ _nn_r2 = _meta['metrics'].get('nn_reg', {}).get('R2')
 
 # Time series visualization (full date range)
 if _full_preds is not None and 'year_month' in _full_preds:
-    st.markdown("**Time Series: Actual vs Predicted Delay Rate**")
+    # st.markdown("**Time Series**  \n"
+    #             "Click the legend to show/hide individual lines.")
 
     full_ridge = np.array(_full_preds['ridge_pred'])
     full_rf = np.array(_full_preds['rf_pred'])
@@ -471,76 +491,89 @@ if _full_preds is not None and 'year_month' in _full_preds:
     fig_ts.add_trace(go.Scatter(
         x=monthly_agg['year_month_dt'], y=monthly_agg['actual'],
         mode='lines+markers', name='Actual',
-        line=dict(color=COL["actual"], width=2.2), marker=dict(size=6),
+        line=dict(color=COL["actual"], width=2.2), marker=dict(size=8),
     ))
     fig_ts.add_trace(go.Scatter(
         x=monthly_agg['year_month_dt'], y=monthly_agg['ridge_pred'],
         mode='lines+markers', name='Ridge',
-        line=dict(color=_ridge_color, width=1.6, dash='dot'), marker=dict(size=4),
+        line=dict(color=_ridge_color, width=1.8, dash='dot'), marker=dict(size=8, symbol='square'),
     ))
     fig_ts.add_trace(go.Scatter(
         x=monthly_agg['year_month_dt'], y=monthly_agg['rf_pred'],
         mode='lines+markers', name='Random Forest',
-        line=dict(color=COL["rf"], width=1.6, dash='dash'), marker=dict(size=4),
+        line=dict(color=COL["rf"], width=1.8, dash='dash'), marker=dict(size=6),
     ))
     if full_nn is not None:
         fig_ts.add_trace(go.Scatter(
             x=monthly_agg['year_month_dt'], y=monthly_agg['nn_pred'],
             mode='lines+markers', name='Neural Network',
-            line=dict(color=COL["nn"], width=1.6, dash='dashdot'), marker=dict(size=4),
+            line=dict(color=COL["nn"], width=1.8, dash='dashdot'), marker=dict(size=6, symbol='x'),
         ))
     fig_ts.update_layout(
+        title="Time-Series",
         xaxis_title="Month",
         yaxis_title="Delay Rate (Monthly Average)",
         hovermode='x unified',
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(
+            orientation="v",
+            xanchor="left", x=0.01,
+            yanchor="top", y=0.99,
+            bgcolor="#efeee9",
+            bordercolor=COL["border"], borderwidth=1,
+            itemclick="toggle", itemdoubleclick="toggleothers",
+        ),
     )
     style_plot(fig_ts, height=500)
     st.plotly_chart(fig_ts, use_container_width=True)
-    st.caption("Aggregated across all routes and airlines. Full date range: 2010–2025.")
+    st.caption("Aggregated across all routes and airlines. Click the legend to show/hide individual lines.")
 
-    st.divider()
-    st.markdown("**Scatter: Actual vs Predicted (Test Set Only)**")
+
 elif _full_preds is None:
     st.info("Time series chart unavailable — run **Update Training** to generate forecasting predictions.")
-    st.markdown("**Scatter: Actual vs Predicted (Test Set Only)**")
 
-n_cols = 3 if nn_preds is not None else 2
-subplot_titles = [f"Ridge (R² = {_ridge_r2:.3f})", f"Random Forest (R² = {_rf_r2:.3f})"]
-if nn_preds is not None:
-    subplot_titles.append(f"Neural Network (R² = {_nn_r2:.3f})")
+st.space("medium")
+#st.markdown("**Correlations**")
 
-fig = make_subplots(rows=1, cols=n_cols, subplot_titles=subplot_titles)
-fig.add_trace(go.Scatter(
-    x=y_true, y=ridge_preds, mode='markers',
-    marker=dict(size=4, opacity=0.45, color=_ridge_color),
-    name='Ridge', showlegend=False,
-), row=1, col=1)
-fig.add_trace(go.Scatter(
-    x=y_true, y=rf_preds, mode='markers',
-    marker=dict(size=4, opacity=0.45, color=COL["rf"]),
-    name='RF', showlegend=False,
-), row=1, col=2)
-if nn_preds is not None:
-    fig.add_trace(go.Scatter(
-        x=y_true, y=nn_preds, mode='markers',
-        marker=dict(size=4, opacity=0.45, color=COL["nn"]),
-        name='NN', showlegend=False,
-    ), row=1, col=3)
-for col in range(1, n_cols + 1):
-    fig.add_trace(go.Scatter(
-        x=[0, 0.6], y=[0, 0.6], mode='lines',
-        line=dict(color=COL["baseline_lag1"], dash='dash'), showlegend=False,
-    ), row=1, col=col)
-    fig.update_xaxes(title_text="Actual Delay Rate", range=[0, 0.6], row=1, col=col)
-    fig.update_yaxes(title_text="Predicted Delay Rate", range=[0, 0.6], row=1, col=col)
+# # Plot actual vs prediction correlations
+# n_cols = 3 if nn_preds is not None else 2
+# subplot_titles = [f"Ridge (R² = {_ridge_r2:.3f})", f"Random Forest (R² = {_rf_r2:.3f})"]
+# if nn_preds is not None:
+#     subplot_titles.append(f"Neural Network (R² = {_nn_r2:.3f})")
 
-style_plot(fig, height=450)
-st.plotly_chart(fig, use_container_width=True)
+# fig = make_subplots(rows=1, cols=n_cols, subplot_titles=subplot_titles)
+# fig.add_trace(go.Scatter(
+#     x=y_true, y=ridge_preds, mode='markers',
+#     marker=dict(size=4, opacity=0.45, color=_ridge_color),
+#     name='Ridge', showlegend=False,
+# ), row=1, col=1)
+# fig.add_trace(go.Scatter(
+#     x=y_true, y=rf_preds, mode='markers',
+#     marker=dict(size=4, opacity=0.45, color=COL["rf"]),
+#     name='RF', showlegend=False,
+# ), row=1, col=2)
+# if nn_preds is not None:
+#     fig.add_trace(go.Scatter(
+#         x=y_true, y=nn_preds, mode='markers',
+#         marker=dict(size=4, opacity=0.45, color=COL["nn"]),
+#         name='NN', showlegend=False,
+#     ), row=1, col=3)
+# for col in range(1, n_cols + 1):
+#     fig.add_trace(go.Scatter(
+#         x=[0, 0.6], y=[0, 0.6], mode='lines',
+#         line=dict(color=COL["baseline_lag1"], dash='dash'), showlegend=False,
+#     ), row=1, col=col)
+#     fig.update_xaxes(title_text="Actual Delay Rate", range=[0, 0.6], row=1, col=col)
+#     fig.update_yaxes(title_text="Predicted Delay Rate", range=[0, 0.6], row=1, col=col)
+# fig.update_layout(
+#     title="Correlations"
+# )
+# style_plot(fig, height=450)
+# st.plotly_chart(fig, use_container_width=True)
+
+# st.space('medium')
 
 # Classification Confusion Matrices
-st.markdown("**Classification: Confusion Matrices**")
-
+#st.markdown("**Classification: Confusion Matrices**")
 y_true_clf = np.array(_preds['y_true_clf'])
 clf_list = []
 if 'xgb_pred' in _preds:
@@ -572,56 +605,11 @@ if clf_list:
         ), row=1, col=i+1)
         fig_cm.update_xaxes(title_text='Predicted', row=1, col=i+1)
         fig_cm.update_yaxes(title_text='Actual', row=1, col=i+1)
+    fig_cm.update_layout(
+        title="Confusion Matrices"
+    )
     style_plot(fig_cm, height=350)
     fig_cm.update_xaxes(showgrid=False)
     fig_cm.update_yaxes(showgrid=False)
     st.plotly_chart(fig_cm, use_container_width=True)
 
-st.divider()
-
-# ---- 5. Feature Importance ----
-st.subheader("5. Feature Weightings")
-st.markdown(
-        "The plot below shows the top 10 most important features, based on the Ridge model's coefficient magnitude. " \
-        "Green = increases predicted delay rate; red = decreases it. "
-        "Coefficients are on standardised features and are directly comparable in magnitude."
-    )
-
-if 'ridge_coefficients' not in metadata or 'ridge_coefficients' not in fmetadata:
-    st.info("Ridge coefficients not available — retrain models to generate them.")
-else:
-    def _top10_coef_df(coef_dict):
-        df = pd.DataFrame([
-            {'Feature': k, 'Coefficient': v}
-            for k, v in coef_dict.items()
-        ])
-        df['abs'] = df['Coefficient'].abs()
-        df = df.nlargest(10, 'abs').sort_values('Coefficient')
-        df['Color'] = df['Coefficient'].apply(
-            lambda v: COL["positive"] if v >= 0 else COL["negative"]
-        )
-        return df
-
-    now_df = _top10_coef_df(metadata['ridge_coefficients'])
-    fore_df = _top10_coef_df(fmetadata['ridge_coefficients'])
-
-    fig_coef = make_subplots(
-        rows=1, cols=2,
-        subplot_titles=["Nowcasting Ridge", "Forecasting Ridge"],
-        horizontal_spacing=0.28,
-    )
-    fig_coef.add_trace(go.Bar(
-        y=now_df['Feature'], x=now_df['Coefficient'],
-        orientation='h', marker_color=now_df['Color'].tolist(),
-        showlegend=False,
-    ), row=1, col=1)
-    fig_coef.add_trace(go.Bar(
-        y=fore_df['Feature'], x=fore_df['Coefficient'],
-        orientation='h', marker_color=fore_df['Color'].tolist(),
-        showlegend=False,
-    ), row=1, col=2)
-    fig_coef.update_xaxes(title_text="Coefficient (standardised)", row=1, col=1)
-    fig_coef.update_xaxes(title_text="Coefficient (standardised)", row=1, col=2)
-    fig_coef.update_yaxes(showticklabels=True, tickfont=dict(size=14), row=1, col=2)
-    style_plot(fig_coef, height=460)
-    st.plotly_chart(fig_coef, use_container_width=True)

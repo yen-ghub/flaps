@@ -74,30 +74,30 @@ if st.button("Update Data", type="primary", key="btn_update"):
 
 st.divider()
 
-# ---- 2. Retrain Nowcasting Models ----
-st.subheader("2. Retrain Nowcasting Models")
+# ---- 2. Retrain NOWCASTING Models ----
+st.subheader("2. Retrain NOWCASTING Models")
 st.markdown(
-    "Retrains nowcasting models (Ridge, Random Forest, Logistic, XGBoost, Neural Network) "
+    "Retrains NOWCASTING models (Ridge, Random Forest, Logistic, XGBoost, Neural Network) "
     "using same-month weather features. Saves to `models/nowcasting/`."
 )
 
-if st.button("Retrain Nowcasting Models", type="primary", key="btn_retrain"):
+if st.button("Retrain NOWCASTING Models", type="primary", key="btn_retrain"):
     from src.train_and_save import train_and_save
 
     log_container = st.empty()
     logger = StreamlitLogger(log_container)
 
-    with st.status("Training nowcasting models...", expanded=True) as status:
+    with st.status("Training NOWCASTING models...", expanded=True) as status:
         old_stdout = sys.stdout
         sys.stdout = logger
         try:
             train_and_save()
             sys.stdout = old_stdout
-            status.update(label="Nowcasting training complete.", state="complete", expanded=False)
-            st.success("Nowcasting models retrained and saved successfully.")
+            status.update(label="NOWCASTING training complete.", state="complete", expanded=False)
+            st.success("NOWCASTING models retrained and saved successfully.")
         except Exception:
             sys.stdout = old_stdout
-            status.update(label="Nowcasting training failed.", state="error", expanded=True)
+            status.update(label="NOWCASTING training failed.", state="error", expanded=True)
             st.error("Training failed. See log above for details.")
             st.code(traceback.format_exc(), language="text")
 
@@ -106,10 +106,10 @@ if st.button("Retrain Nowcasting Models", type="primary", key="btn_retrain"):
 
 st.divider()
 
-# ---- 3. Retrain Forecasting Models ----
-st.subheader("3. Retrain Forecasting Models")
+# ---- 3. Retrain FORECASTING Models ----
+st.subheader("3. Retrain FORECASTING Models")
 st.markdown(
-    "Retrains forecasting models (Ridge, Random Forest, Logistic, XGBoost, Neural Network) using "
+    "Retrains FORECASTING models (Ridge, Random Forest, Logistic, XGBoost, Neural Network) using "
     "only data available prior to the selected month. "
     "Saves to `models/forecasting/`."
 )
@@ -120,17 +120,17 @@ if st.button("Retrain Forecasting Models", type="primary", key="btn_retrain_fore
     log_container = st.empty()
     logger = StreamlitLogger(log_container)
 
-    with st.status("Training forecasting models...", expanded=True) as status:
+    with st.status("Training FORECASTING models...", expanded=True) as status:
         old_stdout = sys.stdout
         sys.stdout = logger
         try:
             train_and_save_forecasting()
             sys.stdout = old_stdout
-            status.update(label="Forecasting training complete.", state="complete", expanded=False)
-            st.success("Forecasting models retrained and saved successfully.")
+            status.update(label="FORECASTING training complete.", state="complete", expanded=False)
+            st.success("FORECASTING models retrained and saved successfully.")
         except Exception:
             sys.stdout = old_stdout
-            status.update(label="Forecasting training failed.", state="error", expanded=True)
+            status.update(label="FORECASTING training failed.", state="error", expanded=True)
             st.error("Training failed. See log above for details.")
             st.code(traceback.format_exc(), language="text")
 

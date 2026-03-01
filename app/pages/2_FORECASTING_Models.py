@@ -89,7 +89,9 @@ st.markdown(
         border-radius: 0;
         padding: 0.8rem;
         min-height: 132px;
+        height: 132px;
         box-sizing: border-box;
+        overflow: hidden;
     }
     .actual-box .label {
         font-family: inherit;
@@ -275,6 +277,7 @@ latest_dt = pd.Timestamp(df['year_month_dt'].max())
 next_month_dt = latest_dt + pd.DateOffset(months=1)
 next_month_label = next_month_dt.strftime('%B %Y')
 
+
 # ── Select a Flight (unified) ──
 st.divider()
 st.subheader("Select a Flight")
@@ -326,6 +329,8 @@ if len(ar_data) == 0:
 if len(ar_with_lags) == 0:
     st.warning("Insufficient data to compute lag features (lag1 + lag12) for this airline-route.")
     st.stop()
+
+st.markdown(f"Latest available data: **{latest_dt.strftime('%B %Y')}**")
 
 # ── Feature extraction (branches on future vs past) ──
 is_future = (pd.Timestamp(selected_dt) == next_month_dt)
@@ -426,9 +431,9 @@ st.subheader("Predictions")
 
 # Regression results
 st.markdown("**Delay rate**")
-st.caption("Percentage of flights in the selected month that are delayed")
+st.caption("Percentage of delayed flights in the selected month")
 
-reg_items = [("Ridge", preds['ridge']), ("Random Forest", preds['rf'])]
+reg_items = [("Ridge ★", preds['ridge']), ("Random Forest", preds['rf'])]
 if has_nn and preds['nn_reg'] is not None:
     reg_items.append(("Neural Network", preds['nn_reg']))
 
@@ -443,7 +448,7 @@ for i, (name, pred) in enumerate(reg_items):
 
 with cols[-1]:
     if is_future:
-        actual_dr_display = "Not yet<br>available"
+        actual_dr_display = '<span style="font-size:2rem">Not available yet</span>'
     else:
         actual_dr_display = f"{actual_delay_rate:.1%}"
     st.markdown(
@@ -458,11 +463,11 @@ st.divider()
 
 # Classification results
 st.markdown("**High-Delay Month Probability**")
-st.caption("Probability that more than 25%% of the flights in the selected month are delayed")
+st.caption("Probability that more than 25% of the flights in the selected month are delayed")
 
 clf_items = [("Logistic", preds['logreg']), ("Random Forest", preds['rf_clf'])]
 if has_xgb:
-    clf_items.append(("XGBoost", preds['xgb']))
+    clf_items.insert(0, (" XGBoost ★", preds['xgb']))
 if has_nn and preds['nn_clf'] is not None:
     clf_items.append(("Neural Network", preds['nn_clf']))
 
@@ -482,7 +487,7 @@ for i, (name, proba) in enumerate(clf_items):
 
 with cols[-1]:
     if is_future:
-        actual_hd_display = "Not yet<br>available"
+        actual_hd_display = '<span style="font-size:2rem">Not available yet</span>'
     else:
         actual_hd_display = "Yes" if actual_is_high else "No"
     st.markdown(
@@ -506,14 +511,15 @@ st.divider()
 st.subheader("Prediction Context")
 ctx_col1, ctx_col2 = st.columns(2)
 with ctx_col1:
-    st.write(f"**Month:** {selected_label}")
-    st.write(f"**Previous month delay rate (lag1):** {lag1_value:.1%}")
-    st.write(f"**Same month last year (lag12):** {lag12_value:.1%}")
+    st.write(f"**Selected month:** {selected_label}")
+    st.write(f"**Delay rate 1 month ago:** {lag1_value:.1%}")
+    st.write(f"**Delay rate 12 months ago:** {lag12_value:.1%}")
     st.write(
         f"**Delay rate gradient:** {gradient:+.1%} "
         f"({'improving' if gradient < 0 else 'worsening' if gradient > 0 else 'stable'})"
     )
 with ctx_col2:
     st.write(f"**Scheduled sectors:** {display_sectors}")
-    st.write(f"**Public holidays (total):** {display_holidays:.0f}")
-    st.write(f"**School holiday coverage:** {display_pct_school:.0%}")
+    st.write(f"**Number of public holidays:** {display_holidays:.0f}")
+    st.write(f"**Percentage of school holidays:** {display_pct_school:.0%}")
+
