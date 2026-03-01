@@ -1,0 +1,35 @@
+# =============================================================================
+# Docker Compose - Local Development
+# =============================================================================
+#
+# Usage:
+#   Start:   docker-compose up
+#   Stop:    docker-compose down
+#   Rebuild: docker-compose up --build
+#
+# This is a convenience wrapper around 'docker build' and 'docker run'.
+# For production deployment, use the Dockerfile directly with Cloud Run.
+#
+# =============================================================================
+
+services:
+  flaps-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    ports:
+      - "8080:8080"
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=true
+      - PORT=8080
+    # Uncomment below to mount local code for development (live reload)
+    # volumes:
+    #   - ./app:/app/app
+    #   - ./src:/app/src
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s

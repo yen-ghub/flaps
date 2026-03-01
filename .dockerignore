@@ -1,0 +1,60 @@
+# =============================================================================
+# Docker Ignore File
+# Files and directories to exclude when building the Docker image
+# =============================================================================
+
+# --- Version Control ---
+.git/
+.gitignore
+
+# --- Python Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pip-log.txt
+
+# --- Virtual Environments ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- IDE / Editor ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- Jupyter Notebooks ---
+# Not needed in production container
+notebooks/
+*.ipynb
+.ipynb_checkpoints/
+
+# --- Documentation / Notes ---
+*.md
+!README.md
+writingstyle/
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Docker ---
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# --- Claude Code ---
+.claude/
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db
+
+# --- Large Raw Data (optional - uncomment if data/raw is very large) ---
+# data/raw/
