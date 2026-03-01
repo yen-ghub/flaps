@@ -11,6 +11,7 @@ Consolidates data pipelines from notebooks 1b and 8a:
 import glob
 import json
 import os
+import re
 from calendar import monthrange
 from datetime import date, datetime
 from ftplib import FTP
@@ -120,19 +121,32 @@ def download_bom_weather_data(cities=None, output_base_path=None):
         print(f"Downloading data for {city.upper()}...")
         ftp.cwd(ftp_path)
         files = [f for f in ftp.nlst() if f.endswith('.csv')]
-        print(f"  Found {len(files)} CSV files")
+        print(f"  Found {len(files)} CSV files on server")
+
+        # Determine the most-recent month so we always re-download it
+        # (BOM updates the current month's file daily as observations arrive)
+        def _extract_yyyymm(fname):
+            m = re.search(r'-(\d{6})\.csv$', fname)
+            return m.group(1) if m else ''
+
+        latest_yyyymm = max((_extract_yyyymm(f) for f in files), default='')
 
         downloaded = 0
+        skipped = 0
         for filename in files:
             local_path = os.path.join(output_folder, filename)
+            is_latest = (_extract_yyyymm(filename) == latest_yyyymm)
+            if os.path.exists(local_path) and not is_latest:
+                skipped += 1
+                continue
             with open(local_path, 'wb') as f:
                 ftp.retrbinary(f'RETR {filename}', f.write)
             downloaded += 1
             if downloaded % 50 == 0:
-                print(f"    Downloaded {downloaded}/{len(files)} files...")
+                print(f"    Downloaded {downloaded} files...")
 
         download_summary[city] = downloaded
-        print(f"  Completed: {downloaded} files downloaded\n")
+        print(f"  Completed: {downloaded} downloaded, {skipped} skipped\n")
 
     ftp.quit()
     print("Download complete.")
@@ -318,23 +332,23 @@ def download_bitre_data(save_path=None):
 
     # Try new version-numbered pattern first (newest to oldest)
     min_version, max_version = BITRE_VERSION_RANGE
-    for version in range(max_version - 1, min_version - 1, -1):
-        filename = f"otp_time_series_master_current_{version}.xlsx"
-        url = base_url + filename
+    # for version in range(max_version - 1, min_version - 1, -1):
+    #     filename = f"otp_time_series_master_current_{version}.xlsx"
+    #     url = base_url + filename
 
-        print(f"Attempting to download: {filename}")
-        try:
-            response = requests.get(url, headers=headers, timeout=60)
-            if response.status_code == 200:
-                filepath = os.path.join(save_path, filename)
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
-                print(f"  Successfully downloaded: {filename}")
-                return filepath
-            else:
-                print(f"  Not found (HTTP {response.status_code})")
-        except requests.RequestException as e:
-            print(f"  Failed: {type(e).__name__}")
+    #     print(f"Attempting to download: {filename}")
+    #     try:
+    #         response = requests.get(url, headers=headers, timeout=60)
+    #         if response.status_code == 200:
+    #             filepath = os.path.join(save_path, filename)
+    #             with open(filepath, 'wb') as f:
+    #                 f.write(response.content)
+    #             print(f"  Successfully downloaded: {filename}")
+    #             return filepath
+    #         else:
+    #             print(f"  Not found (HTTP {response.status_code})")
+    #     except requests.RequestException as e:
+    #         print(f"  Failed: {type(e).__name__}")
 
     # Fall back to old date-based pattern
     current_date = datetime.now()
@@ -375,7 +389,7 @@ def _get_latest_bitre_file():
     """
     # Search for both old and new patterns
     pattern_old = os.path.join(DATA_RAW, 'OTP_Time_Series_Master_Current_*.xlsx')
-    pattern_new = os.path.join(DATA_RAW, 'otp_time_series_master_current_*.xlsx')
+    #pattern_new = os.path.join(DATA_RAW, 'otp_time_series_master_current_*.xlsx')
 
     local_files = glob.glob(pattern_old) + glob.glob(pattern_new)
 

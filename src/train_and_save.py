@@ -389,6 +389,7 @@ def train_and_save():
         'metrics': {k: {mk: float(mv) for mk, mv in v.items()} for k, v in metrics.items()},
         'route_metrics': route_metrics,
         'feature_importance': importance,
+        'ridge_coefficients': {name: float(coef) for name, coef in zip(feature_names, ridge.coef_)},
         'baseline_lag1_r2': overall_lag1_r2,
         'train_mean': train_mean,
         'split': {
@@ -716,6 +717,37 @@ def train_and_save_forecasting():
     with open(os.path.join(save_dir, 'test_predictions.json'), 'w') as f:
         json.dump(test_predictions, f)
 
+    # Save full dataset predictions for time series visualisation
+    print("\nGenerating predictions for full dataset (train+val+test)...")
+    X_all = df_processed[feature_names].values
+    X_all_scaled = scaler.transform(X_all)
+
+    ridge_pred_all = ridge.predict(X_all_scaled)
+    rf_pred_all = rf_reg.predict(X_all)
+    nn_reg_pred_all = nn_reg.predict(X_all_scaled, verbose=0).flatten() if nn_reg is not None else None
+
+    full_predictions = {
+        'y_true_reg': df_processed['delay_rate'].tolist(),
+        'ridge_pred': ridge_pred_all.tolist(),
+        'rf_pred': rf_pred_all.tolist(),
+        'year_month': df_processed['year_month'].tolist(),
+        'year': df_processed['year'].tolist(),
+        'split': [],
+    }
+    for i in df_processed.index:
+        if splits['train_mask'][i]:
+            full_predictions['split'].append('train')
+        elif splits['val_mask'][i]:
+            full_predictions['split'].append('val')
+        else:
+            full_predictions['split'].append('test')
+
+    if nn_reg_pred_all is not None:
+        full_predictions['nn_reg_pred'] = nn_reg_pred_all.tolist()
+
+    with open(os.path.join(save_dir, 'full_predictions.json'), 'w') as f:
+        json.dump(full_predictions, f)
+
     # Save metadata
     metadata = {
         'feature_names': feature_names,
@@ -725,6 +757,7 @@ def train_and_save_forecasting():
         'metrics': {k: {mk: float(mv) for mk, mv in v.items()} for k, v in metrics.items()},
         'route_metrics': route_metrics,
         'feature_importance': importance,
+        'ridge_coefficients': {name: float(coef) for name, coef in zip(feature_names, ridge.coef_)},
         'baseline_lag1_r2': overall_lag1_r2,
         'train_mean': train_mean,
         'uses_load_factor': using_lf,
