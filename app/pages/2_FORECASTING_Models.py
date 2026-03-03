@@ -146,7 +146,7 @@ def get_data():
     df = load_training_data()
     df = add_derived_columns(df)
     # Ensure year_month_dt is proper datetime (CSV may store as string)
-    df['year_month_dt'] = pd.to_datetime(df['year_month_dt'])
+    df['year_month_dt'] = pd.to_datetime(df['year_month_dt'], format='mixed')
     df = filter_low_volume(df)
     df = filter_anomalous_routes(df)
     df = compute_lag_features(df)

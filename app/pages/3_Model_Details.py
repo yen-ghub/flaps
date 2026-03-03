@@ -18,7 +18,7 @@ NOWCASTING_MODELS_DIR = os.path.join(PROJECT_ROOT, "models", "nowcasting")
 FORECASTING_MODELS_DIR = os.path.join(PROJECT_ROOT, "models", "forecasting")
 
 
-st.set_page_config(page_title="FLAPS — Model Architecture", page_icon="✈️", layout="wide")
+st.set_page_config(page_title="FLAPS — Model Details", page_icon="✈️", layout="wide")
 apply_theme(
     extra_css="""
     .swiss-note {
@@ -112,12 +112,15 @@ apply_theme(
         width: 420px;
     }
     .swiss-table td:last-child { width: 420px; }
+    /* Tight 2-column table (Parameter/Value) */
+    .swiss-table-tight th:nth-child(1), .swiss-table-tight td:nth-child(1) { width: 140px; }
+    .swiss-table-tight th:nth-child(2), .swiss-table-tight td:nth-child(2) { width: 120px; }
     """
 )
-st.title("Model Architecture")
+st.title("Model Details")
 st.markdown("""
-            The architectures of the top 3 performing machine learning models are presented below.
-""")
+            The top 3 machine learning models the nowcasting and forecasting approaches, when considering both the performance metrics and interpretability, are discussed in further detail below.
+            """)
 
 COL = {
     "positive": "#2f6b3c",
@@ -189,7 +192,7 @@ def get_layer_rows(model):
     return rows
 
 
-def render_swiss_table(rows, columns):
+def render_swiss_table(rows, columns, table_class="swiss-table"):
     """Render a compact Swiss-style HTML table."""
     if not rows:
         return
@@ -205,7 +208,7 @@ def render_swiss_table(rows, columns):
     st.markdown(
         f"""
         <div class="swiss-table-wrap" style="display:inline-block;">
-            <table class="swiss-table">
+            <table class="{table_class}">
                 <thead><tr>{header_html}</tr></thead>
                 <tbody>{body_html}</tbody>
             </table>
@@ -225,18 +228,17 @@ except FileNotFoundError as e:
     st.stop()
 
 # ---- 1. Ridge Regression ----
-st.markdown("### 1. Ridge Regression")
-st.markdown("The overall best **regression** model (i.e. in predicting the percentage of delayed flights).  \n"
-    "Although this model's accuracy is slightly lower than the more complex models, its high interpretability justifies the small trade-off.")
-#st.space('xxsmall')
-st.markdown("#### Flowchart")
-render_flow_row([
-    "Input features",
-    "StandardScaler<br>Z-score normalisation",
-    "Ridge linear model<br>y_hat = w x + b",
-    "Output: predicted delay rate",
-])
-# st.markdown('<div class="pipeline-gap"></div>', unsafe_allow_html=True)
+st.markdown("### 1. For Regression Nowcasting: Ridge")
+st.markdown("This is the best regression model (i.e. in predicting the percentage of delayed flights) under the nowcasting approach.  \n"
+            "One of the aims of the nowcasting approach is to ascertain the dominant features, which requires the model to be easily interpretable.  \n"
+            "Thus, while its accuracy (_R²_ = 0.5172) is slightly lower than the more complex models line Neural Network (_R²_ = 0.5427), this trade-off is justifiable due to its high interpretability.")
+
+# Plot the flowchart
+st.markdown("Figure 1 visualises the schematic workflow of the Ridge model to predict the delay rate.  \n"
+            "The parameters of this model are the weighting coefficients, _w_, and the biases, _b_.")
+image_path = os.path.join(PROJECT_ROOT, "app", "images", "diagram_linear.svg")
+st.image(image_path, width=480)
+st.caption("**Figure 1.** The schematic workflow diagram of the Ridge model.")
 st.space('small')
 
 
@@ -263,7 +265,7 @@ _FEATURE_DESCRIPTIONS = {
     "route_Perth_Adelaide":      "Route indicator: Perth to Adelaide",
 }
 
-
+# This is to draw the bar plot inside the table cells
 def _svg_bar(value, max_abs, bar_width=320, zero_pct=0.25):
     """Return an SVG bar + numeric label for a coefficient cell.
     zero_pct controls where the zero-line sits (0.25 = 25% from left).
@@ -288,7 +290,7 @@ def _svg_bar(value, max_abs, bar_width=320, zero_pct=0.25):
         f'</div>'
     )
 
-
+# This is to extract the coefficients from the saved model parameters
 def _ridge_coef_section(models_dir, metadata, max_abs=None):
     try:
         ridge_path = os.path.join(models_dir, "ridge_regressor.pkl")
@@ -345,19 +347,12 @@ def _ridge_coef_section(models_dir, metadata, max_abs=None):
         st.error("Failed to render Ridge coefficients.")
         st.code(str(exc), language="text")
 
-
 st.markdown("#### Model interpretation")
-st.markdown("Since the model input features are normalised, the linear regression models can be interpreted by inspecting the weight coefficients, _w_, where:  \n"
-            "- Larger _postive_ weight means the feature contributes more to _increase_ the delay rate.  \n"
-            "- Conversely, larger _negative_ weight means the feature contributes more to _decrease_ the delay rate.  \n"
-            "- Shown below are the top 10 most dominant parameters."
-)
-st.markdown("Interpretation of the most extreme features:  \n"
-            "- Most positive feature, `delay_rate_lag1`: high delay rate in a particular month means it is likely remain high in the next month as well.  \n"
-            "   _This suggest that persisting operational problem, such as staff shortage or unplanned airplane repairs._  \n"
-            "- Most negative feature, `delay_rate_gradient`: when delay rate has been worsening month-to-month, it improves the likelihood that it will be lower the next month.  \n"
-            "   _This may indicate that arlines notice the worsening trend, and then take appropriate measures to combat the problem._"
-)   
+st.markdown("Since the model input features are normalised, the linear regression models can be interpreted by inspecting _w_, where:  \n"
+            "- a larger _positive_ weight indicates that the feature contributes more to increase the delay rate;  \n"
+            "- conversely, a larger _negative_ weight indicates the feature contributes more to _decrease_ the delay rate.  \n"
+            )
+st.markdown("The 10 most dominant features under the nowcasting approach are presented in Table 1 below.")
 
 def _top10_max_abs(models_dir, metadata):
     try:
@@ -376,18 +371,33 @@ def _top10_max_abs(models_dir, metadata):
 
 # Plot the feature tables
 st.space('small')
-st.markdown("**NOWCASTING**")
+st.caption("**Table.1** The top 10 features contributing to the current months delay rate.")
 _ridge_coef_section(NOWCASTING_MODELS_DIR, now_metadata)
 st.space('small')
-st.markdown("**FORECASTING**")
-_ridge_coef_section(FORECASTING_MODELS_DIR, fore_metadata)
+# st.markdown("**FORECASTING**")
+# _ridge_coef_section(FORECASTING_MODELS_DIR, fore_metadata)
 
+st.markdown("It is observed that:  \n"
+            "- For the strongest positive feature, `delay_rate_lag1`: when the delay rate is high in a particular month, it is likely to remain high in the next month as well.  \n"
+            "   _This may suggest persisting operational problems, such as crew shortage or unplanned maintenance issues._  \n"
+            "- For the strongest negative feature, `delay_rate_gradient`: when delay rate has been worsening month-to-month, it improves the likelihood that it will be lower the next month.  \n"
+            "   _This may indicate that arlines notice the worsening trend, and then take appropriate measures to combat the problem._"           
+            )   
+
+###
 
 # ---- 2. XGBoost Classification ----
 st.divider()
-st.markdown("### 2. XGBoost Classification")
-st.markdown("The overall best **classification** model (i.e. in predicting high delay rate month).  \n"
-    "It has the best balance between precision (minimise false positive) and recall (minimise false negative).")
+st.markdown("### 2. For Classification Nowcasting and Forecasting: XGBoost")
+st.markdown("This is the best classification model (i.e. in predicting if it is a high delay rate month) under both the nowcasting and forecasting approaches.  \n"
+            "Its accuracy (_F1_ = 0.7525 for nowcasting, _F1_ = 0.7415 for forecasting) is slightly lower than the Neural Network model (_F1_ = 0.7618 for nowcasting, _F1_ = 0.7620 for forecasting).  \n"
+            "However, after inspecting the accuracy breakdown, XGBoost exhibits the best balance between _precision_ (a measure of how well the model avoids false positive) and _recall_ (how well the model avoids false negative)."
+            )
+st.markdown("For example, the precision and recall for the XGBoost model are both moderately high at 0.7475 and 0.7357, respectively, while the corresponding values for the Neural Network model are imbalanced at 0.6744 and 0.8757.  \n"
+            "The lower recall score means the model is prone to classifying a month as high delay even it is not the case, which is not desirable as it may lead to unnecessary additional spending in anticipation of the high delay."
+            )
+st.markdown("")
+
 try:
     xgb_path = os.path.join(NOWCASTING_MODELS_DIR, "xgb_classifier.pkl")
     xgb_model = load_joblib_model(xgb_path)
@@ -398,31 +408,25 @@ try:
     learning_rate = params.get("learning_rate", "unknown")
     min_child_weight = params.get("min_child_weight", "unknown")
 
-    st.markdown("  \n")
-    st.markdown("#### Flowchart")
-    render_flow_row([
-        "Input features",
-        "Tree 1",
-        "Tree 2",
-        "...",
-        f"Tree {n_estimators}",
-        "Additive score",
-        "Sigmoid",
-        "P(high delay)",
-    ])
-    st.markdown('<div class="pipeline-gap"></div>', unsafe_allow_html=True)
+    image_path = os.path.join(PROJECT_ROOT, "app", "images", "diagram_xgb.svg")
+    st.image(image_path, width=500)
+    st.caption("**Figure 2**. The schematic workflow of the XGBoost model.")
 
-    st.markdown("  \n")
-    st.markdown("#### Model Hyperparameters")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.metric("n_estimators", f"{n_estimators}")
-    with c2:
-        st.metric("max_depth", f"{max_depth}")
-    with c3:
-        st.metric("learning_rate", f"{learning_rate}")
-    with c4:
-        st.metric("min_child_weight", f"{min_child_weight}")
+    st.space('small')
+    st.markdown("The hyperparameters of the XGBoost models, shown in Table 2 below, are obtained from the fine-tuning process using the validation dataset."
+                )
+    st.caption("**Table 2.** The hyperparameters of the XGBoost model  \n"
+                )
+    render_swiss_table(
+        [
+            {"Parameter": "n_estimators", "Value": n_estimators},
+            {"Parameter": "max_depth", "Value": max_depth},
+            {"Parameter": "learning_rate", "Value": learning_rate},
+            {"Parameter": "min_child_weight", "Value": min_child_weight},
+        ],
+        columns=["Parameter", "Value"],
+        table_class="swiss-table swiss-table-tight",
+    )
 except FileNotFoundError:
     st.warning(f"XGBoost model file not found: `{NOWCASTING_MODELS_DIR}/xgb_classifier.pkl`")
 except Exception as exc:
@@ -430,12 +434,15 @@ except Exception as exc:
     st.code(str(exc), language="text")
 
 
+###
+
 # ---- 3. Neural Network Models ----
 st.divider()
-st.subheader("3. Neural Network Models")
-st.markdown("The highest accuracy model **on average** across all models.  \n"
-    "While this model yields the best performance metrics, the benefit margin does not justify the trade-offs in complexity and interpretability.")
-
+st.subheader("3. For Regression Forecasting: Neural Network Models")
+st.markdown("This is the best regression model under the forecasting approach, because it has the highest accuracy (_R²_ = 0.5096) vs the other two models (_R²_ = 0.4931 and 0.5052).  \n"
+    "Unlike the nowcasting approach (where intrepretibility is important), the accuracy of prediction is the main priority when forecasting for the upcoming month.")
+st.markdown("The neural network architecture used to predict the delay rate under the nowcasting and forecasting approaches (identical in both) are presented in Table 3 as a list of the employed neural network layers."
+            )
 try:
     nn_reg_path = os.path.join(NOWCASTING_MODELS_DIR, "nn_regressor.keras")
     nn_clf_path = os.path.join(NOWCASTING_MODELS_DIR, "nn_classifier.keras")
@@ -443,7 +450,7 @@ try:
 
     if missing:
         st.warning(
-            f"Neural network artefacts not found at `{NOWCASTING_MODELS_DIR}`. "
+            f"Neural Network artefacts not found at `{NOWCASTING_MODELS_DIR}`. "
             "Retrain the nowcasting model to generate NN artefacts."
         )
     else:
@@ -452,18 +459,18 @@ try:
 
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("#### Regression Network Layers")
+            st.caption("**Table 3.** The layers employed in the Neural Network model for both the nowcasting and forecasting approaches.")
             render_swiss_table(
                 get_layer_rows(nn_reg),
                 columns=["Layer", "Type", "Units", "Activation", "Dropout", "Params"],
             )
 
-        with col2:
-            st.markdown("#### Classification Network Layers")
-            render_swiss_table(
-                get_layer_rows(nn_clf),
-                columns=["Layer", "Type", "Units", "Activation", "Dropout", "Params"],
-            )
+        # with col2:
+        #     st.caption("**Table 4.** The layers employed in the classification Neural Network model.")
+        #     render_swiss_table(
+        #         get_layer_rows(nn_clf),
+        #         columns=["Layer", "Type", "Units", "Activation", "Dropout", "Params"],
+        #     )
 
 except Exception as exc:
     st.error("Failed to render Neural Network architecture.")

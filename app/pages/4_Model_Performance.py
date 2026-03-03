@@ -322,7 +322,7 @@ fig.add_trace(go.Bar(
 ))
 fig.update_layout(
     yaxis_title="R²",
-    title="NOWCASTING",
+    #title="NOWCASTING",
     yaxis=dict(range=[0, max(r2_values) * 1.2]),
 )
 style_plot(fig, height=400)

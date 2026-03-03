@@ -10,16 +10,22 @@ import traceback
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
+import pandas as pd
 import streamlit as st
 from src.ui_theme import apply_theme
 
 st.set_page_config(page_title="FLAPS — Update & Train", page_icon="✈️", layout="wide")
 apply_theme()
-st.title("Update & Train")
+st.title("Update and Re-train")
 st.markdown(
-    "Download the latest data from BOM and BITRE, then retrain models. "
+    "Download the latest data from BOM, BITRE, and Flightera, then retrain models. "
     "Each operation may take several minutes."
 )
+
+_training_path = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'processed', 'ml_training_data_multiroute_hols.csv')
+if os.path.exists(_training_path):
+    _df_info = pd.read_csv(_training_path, usecols=['year_month'])
+    st.markdown(f"Latest available data: **{pd.Timestamp(_df_info['year_month'].max()).strftime('%B %Y')}**")
 
 
 class StreamlitLogger(io.StringIO):
@@ -45,8 +51,9 @@ st.divider()
 # ---- 1. Update Data ----
 st.subheader("1. Update Data")
 st.markdown(
-    "Downloads the latest weather observations from BOM FTP and flight performance "
-    "data from BITRE, then merges them into the training dataset."
+    "Downloads the latest weather observations from BOM FTP, along with the flight performance "
+    "data from BITRE and Flightera API (most recent month only), and "
+    "then merges them into the training dataset."
 )
 
 if st.button("Update Data", type="primary", key="btn_update"):
@@ -75,13 +82,13 @@ if st.button("Update Data", type="primary", key="btn_update"):
 st.divider()
 
 # ---- 2. Retrain NOWCASTING Models ----
-st.subheader("2. Retrain NOWCASTING Models")
+st.subheader("2. Re-train NOWCASTING Models")
 st.markdown(
-    "Retrains NOWCASTING models (Ridge, Random Forest, Logistic, XGBoost, Neural Network) "
+    "Re-trains NOWCASTING models (Ridge, Random Forest, Logistic, XGBoost, Neural Network) "
     "using same-month weather features. Saves to `models/nowcasting/`."
 )
 
-if st.button("Retrain NOWCASTING Models", type="primary", key="btn_retrain"):
+if st.button("Re-train NOWCASTING Models", type="primary", key="btn_retrain"):
     from src.train_and_save import train_and_save
 
     log_container = st.empty()
@@ -107,14 +114,14 @@ if st.button("Retrain NOWCASTING Models", type="primary", key="btn_retrain"):
 st.divider()
 
 # ---- 3. Retrain FORECASTING Models ----
-st.subheader("3. Retrain FORECASTING Models")
+st.subheader("3. Re-train FORECASTING Models")
 st.markdown(
-    "Retrains FORECASTING models (Ridge, Random Forest, Logistic, XGBoost, Neural Network) using "
+    "Re-trains FORECASTING models (Ridge, Random Forest, Logistic, XGBoost, Neural Network) using "
     "only data available prior to the selected month. "
     "Saves to `models/forecasting/`."
 )
 
-if st.button("Retrain Forecasting Models", type="primary", key="btn_retrain_forecast"):
+if st.button("Re-train Forecasting Models", type="primary", key="btn_retrain_forecast"):
     from src.train_and_save import train_and_save_forecasting
 
     log_container = st.empty()
