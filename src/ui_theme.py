@@ -49,10 +49,12 @@ _BASE_THEME_CSS = """
 }
 [data-testid="stSidebar"] {
     background: #efeee9;
-    border-right: 1px solid rgba(13, 13, 13, 0.25);
+    width: 210px !important;
 }
 [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
     background: #efeee9;
+    border-right: 1px solid rgba(13, 13, 13, 0.25);
+    width: 210px !important;
 }
 [data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
     border-radius: 0 !important;

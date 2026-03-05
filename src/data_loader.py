@@ -12,6 +12,7 @@ import glob
 import json
 import os
 import re
+import time
 from calendar import monthrange
 from datetime import date, datetime
 from ftplib import FTP
@@ -22,6 +23,7 @@ import numpy as np
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
+from dotenv import load_dotenv
 
 try:
     import holidays as holidays_lib
@@ -74,6 +76,31 @@ AIRPORT_FTP_PATHS = {
 }
 
 STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA']
+
+# Flightera API
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+
+FLIGHTERA_BASE_URL = 'https://flightera-flight-data.p.rapidapi.com'
+FLIGHTERA_REQUEST_DELAY = 0.1   # seconds between API calls
+FLIGHTERA_REQUEST_TIMEOUT = 30
+FLIGHTERA_MAX_RETRIES = 3
+FLIGHTERA_MIN_FLIGHTS = 50
+
+CITY_TO_ICAO = {
+    'Sydney': 'YSSY', 'Melbourne': 'YMML', 'Brisbane': 'YBBN',
+    'Perth': 'YPPH', 'Adelaide': 'YPAD', 'Hobart': 'YMHB',
+}
+
+FLIGHTERA_AIRLINES = [
+    {'bitre_name': 'Qantas',                            'iata': 'QF', 'icao': 'QFA'},
+    {'bitre_name': 'Virgin Australia',                   'iata': 'VA', 'icao': 'VAA'},
+    {'bitre_name': 'Jetstar',                            'iata': 'JQ', 'icao': 'JST'},
+    {'bitre_name': 'QantasLink',                         'iata': 'QF', 'icao': 'QLK'},
+    {'bitre_name': 'Rex Airlines',                       'iata': 'ZL', 'icao': 'RXA'},
+    {'bitre_name': 'Regional Express',                   'iata': 'ZL', 'icao': 'RXA'},
+    {'bitre_name': 'Tigerair Australia',                 'iata': 'TT', 'icao': 'TGW'},
+    {'bitre_name': 'Virgin Australia Regional Airlines', 'iata': 'VA', 'icao': 'VOZ'},
+]
 
 
 # ===========================================================================
@@ -391,7 +418,8 @@ def _get_latest_bitre_file():
     pattern_old = os.path.join(DATA_RAW, 'OTP_Time_Series_Master_Current_*.xlsx')
     #pattern_new = os.path.join(DATA_RAW, 'otp_time_series_master_current_*.xlsx')
 
-    local_files = glob.glob(pattern_old) + glob.glob(pattern_new)
+    local_files = glob.glob(pattern_old)
+    #local_files = glob.glob(pattern_old) + glob.glob(pattern_new)
 
     if not local_files:
         raise FileNotFoundError("No BITRE data file found in data/raw/")
@@ -608,7 +636,332 @@ def prepare_training_data(cities=None, bitre_file=None, output_filename=None):
 
 
 # ===========================================================================
-# 6. Full Data Update Pipeline
+# 6. Flightera API Pipeline (supplements BITRE with near-real-time data)
+# ===========================================================================
+
+def _flightera_api_get(endpoint, params, headers):
+    """GET request to Flightera API with retry and rate limiting."""
+    url = f'{FLIGHTERA_BASE_URL}{endpoint}'
+    delay = 1.0
+    for attempt in range(FLIGHTERA_MAX_RETRIES):
+        try:
+            resp = requests.get(
+                url, headers=headers, params=params,
+                timeout=FLIGHTERA_REQUEST_TIMEOUT,
+            )
+        except requests.RequestException:
+            if attempt == FLIGHTERA_MAX_RETRIES - 1:
+                return None
+            time.sleep(delay)
+            delay *= 2
+            continue
+
+        if resp.status_code == 200:
+            return resp.json()
+        if resp.status_code == 429 or resp.status_code >= 500:
+            if attempt == FLIGHTERA_MAX_RETRIES - 1:
+                return None
+            time.sleep(delay)
+            delay *= 2
+            continue
+        # 400/404 — no data for this query, don't retry
+        return None
+    return None
+
+
+def _discover_flight_numbers(routes_df, airlines, year_month, headers):
+    """Discover active flight numbers for each airline-route via /airline/routes."""
+    year, month = year_month.split('-')
+    discovery_dates = [f'{year}-{month}-{d:02d}' for d in range(8, 15)]
+
+    discovery_rows = []
+    seen = set()
+    total_routes = len(routes_df)
+
+    for route_idx, (_, route) in enumerate(routes_df.iterrows(), 1):
+        dep, arr = route['departing_port'], route['arriving_port']
+        print(f"  Route {route_idx}/{total_routes}: {dep} -> {arr}")
+
+        for airline in airlines:
+            for dt in discovery_dates:
+                time.sleep(FLIGHTERA_REQUEST_DELAY)
+                result = _flightera_api_get('/airline/routes', {
+                    'departure': route['origin_icao'],
+                    'arrival': route['dest_icao'],
+                    'date': dt,
+                    'airline': airline['icao'],
+                }, headers)
+
+                routes_list = _extract_flnrs(result)
+
+                if len(routes_list) == 0:
+                    # Fallback to IATA code
+                    time.sleep(FLIGHTERA_REQUEST_DELAY)
+                    result = _flightera_api_get('/airline/routes', {
+                        'departure': route['origin_icao'],
+                        'arrival': route['dest_icao'],
+                        'date': dt,
+                        'airline': airline['iata'],
+                    }, headers)
+                    routes_list = _extract_flnrs(result)
+
+                for rec in routes_list:
+                    flnr = rec.get('flnr', '')
+                    key = (dep, arr, airline['icao'], flnr)
+                    if flnr and key not in seen:
+                        seen.add(key)
+                        discovery_rows.append({
+                            'departing_port': dep,
+                            'arriving_port': arr,
+                            'origin_icao': route['origin_icao'],
+                            'dest_icao': route['dest_icao'],
+                            'airline_icao': airline['icao'],
+                            'bitre_name': airline['bitre_name'],
+                            'flnr': flnr,
+                        })
+
+    print(f"  Unique flight numbers discovered: {len(discovery_rows)}")
+    return pd.DataFrame(discovery_rows)
+
+
+def _extract_flnrs(result):
+    """Extract flnr list from Flightera API response."""
+    if isinstance(result, dict) and 'routes' in result:
+        return result['routes']
+    if isinstance(result, list):
+        return result
+    return []
+
+
+def _fetch_monthly_stats(df_flnr, year, month, headers):
+    """Fetch pre-aggregated monthly stats for each discovered flight number."""
+    unique_flnrs = df_flnr['flnr'].unique()
+    total = len(unique_flnrs)
+    print(f"  Fetching stats for {total} flight numbers...")
+
+    stats_rows = []
+    for i, flnr in enumerate(unique_flnrs, 1):
+        if i % 50 == 0:
+            print(f"    Flight number {i}/{total}")
+        time.sleep(FLIGHTERA_REQUEST_DELAY)
+        result = _flightera_api_get('/flight/statistics/monthly', {
+            'flnr': flnr,
+            'month': month,
+            'year': year,
+        }, headers)
+
+        if result is None or not isinstance(result, list):
+            continue
+        for rec in result:
+            rec['_flnr_query'] = flnr
+            stats_rows.append(rec)
+
+    print(f"  Stats records collected: {len(stats_rows)}")
+    return pd.DataFrame(stats_rows) if stats_rows else pd.DataFrame()
+
+
+def _aggregate_to_bitre_format(df_stats, df_flnr, year_month):
+    """Aggregate per-flight stats to airline-route level in BITRE-compatible format."""
+    year, month = year_month.split('-')
+
+    df_joined = df_stats.merge(
+        df_flnr[['flnr', 'departing_port', 'arriving_port', 'origin_icao', 'dest_icao', 'bitre_name']],
+        left_on='_flnr_query', right_on='flnr',
+        how='left', suffixes=('', '_disc'),
+    )
+    df_joined['count'] = pd.to_numeric(df_joined['count'], errors='coerce').fillna(0).astype(int)
+    df_joined['delay_percentage'] = pd.to_numeric(df_joined['delay_percentage'], errors='coerce').fillna(0)
+    df_joined['cancelled_percentage'] = pd.to_numeric(df_joined['cancelled_percentage'], errors='coerce').fillna(0)
+    df_joined = df_joined[df_joined['count'] > 0].copy()
+
+    # Keep only the stats row for the specific route leg — the stats API returns all
+    # segments a flight number operates globally, not just the queried origin→destination.
+    df_joined = df_joined[
+        (df_joined['from'] == df_joined['origin_icao']) &
+        (df_joined['to'] == df_joined['dest_icao'])
+    ].copy()
+
+    # Reclassify by callsign: QLK callsigns are QantasLink operated under Qantas flight numbers
+    qlk_mask = df_joined['callsign'].str.startswith('QLK', na=False)
+    df_joined.loc[qlk_mask, 'bitre_name'] = 'QantasLink'
+
+    # Impute delay_percentage for rows with missing avg_delay (no timing data recorded).
+    # These rows have delay_percentage = 0 by default, biasing the aggregate downward.
+    # Replace with the flight-count-weighted mean of the other flights in the same airline group.
+    missing_mask = df_joined['avg_delay'].isna()
+    for airline, grp_idx in df_joined.groupby('bitre_name').groups.items():
+        grp = df_joined.loc[grp_idx]
+        known = grp[~missing_mask.loc[grp_idx]]
+        if len(known) == 0:
+            continue
+        mean_delay_pct = (known['delay_percentage'] * known['count']).sum() / known['count'].sum() + 10
+        df_joined.loc[grp_idx[missing_mask.loc[grp_idx]], 'delay_percentage'] = mean_delay_pct
+
+    # Scale count and delay_percentage to flown flights only (exclude cancellations).
+    # Flightera count = scheduled; delay_percentage = delayed / scheduled.
+    # BITRE sectors_flown = scheduled * (1 - cancel_rate); delay_rate = delayed / flown.
+    cancel_rate = df_joined['cancelled_percentage'] / 100.0
+    df_joined['flown'] = df_joined['count'] * (1 - cancel_rate)
+    df_joined['delay_pct_flown'] = df_joined['delay_percentage'] / (1 - cancel_rate).clip(lower=1e-6)
+
+    agg_rows = []
+    for (dep, arr, airline), grp in df_joined.groupby(['departing_port', 'arriving_port', 'bitre_name']):
+        sectors_scheduled = int(grp['count'].sum())
+        sectors_flown = int(grp['flown'].sum().round())
+        cancellations = sectors_scheduled - sectors_flown
+        cancel_pct = round(cancellations / sectors_scheduled * 100, 2) if sectors_scheduled > 0 else 0
+        w = grp['flown']
+        delay_rate = (grp['delay_pct_flown'] * w).sum() / w.sum() / 100.0 if w.sum() > 0 else 0
+        arrivals_delayed = round(sectors_flown * delay_rate)
+        arrivals_on_time = sectors_flown - arrivals_delayed
+
+        agg_rows.append({
+            'departing_port': dep,
+            'arriving_port': arr,
+            'airline': airline,
+            'month': pd.Timestamp(f'{year}-{month}-01'),
+            'year_month': year_month,
+            'year': int(year),
+            'sectors_scheduled': sectors_scheduled,
+            'sectors_flown': sectors_flown,
+            'arrivals_on_time': arrivals_on_time,
+            'arrivals_delayed': arrivals_delayed,
+            'cancellations': cancellations,
+            'cancellations_pct': cancel_pct,
+            'delay_rate': round(delay_rate, 6),
+            'is_high_delay': int(delay_rate > 0.25),
+        })
+
+    df_bitre = pd.DataFrame(agg_rows)
+    df_filtered = df_bitre[df_bitre['sectors_flown'] >= FLIGHTERA_MIN_FLIGHTS].copy()
+    print(f"  Airline-route groups: {len(df_bitre)} total, {len(df_filtered)} with >= {FLIGHTERA_MIN_FLIGHTS} flights")
+    return df_filtered
+
+
+def append_flightera_data(year_month, cities=None):
+    """
+    Fetch flight data for a given month via Flightera API and merge into training data.
+
+    Discovers flight numbers, fetches monthly stats, aggregates to BITRE format,
+    merges weather + holiday features, and appends to the training CSV
+    (replacing any existing rows for that month).
+
+    Parameters
+    ----------
+    year_month : str
+        Target month in 'YYYY-MM' format.
+    cities : list of str or None
+        City full names. Defaults to all 6.
+    """
+    if cities is None:
+        cities = DEFAULT_CITIES
+
+    rapidapi_key = os.environ.get('RAPIDAPI_KEY', '')
+    if not rapidapi_key:
+        raise ValueError('RAPIDAPI_KEY not set in environment or .env file.')
+
+    headers = {
+        'x-rapidapi-host': 'flightera-flight-data.p.rapidapi.com',
+        'x-rapidapi-key': rapidapi_key,
+    }
+
+    year, month = year_month.split('-')
+
+    # Build routes DataFrame
+    route_pairs = list(permutations(cities, 2))
+    routes_df = pd.DataFrame(route_pairs, columns=['departing_port', 'arriving_port'])
+    routes_df['origin_icao'] = routes_df['departing_port'].map(CITY_TO_ICAO)
+    routes_df['dest_icao'] = routes_df['arriving_port'].map(CITY_TO_ICAO)
+
+    # Deduplicate airlines by ICAO
+    airlines = []
+    seen_icao = set()
+    for a in FLIGHTERA_AIRLINES:
+        if a['icao'] not in seen_icao:
+            seen_icao.add(a['icao'])
+            airlines.append(a)
+
+    # Step 1: Discover flight numbers
+    print(f"Discovering flight numbers for {year_month}...")
+    df_flnr = _discover_flight_numbers(routes_df, airlines, year_month, headers)
+    if len(df_flnr) == 0:
+        print("No flight numbers discovered. Skipping Flightera update.")
+        return
+
+    # Step 2: Fetch monthly stats
+    print(f"Fetching monthly statistics...")
+    df_stats = _fetch_monthly_stats(df_flnr, year, month, headers)
+    if len(df_stats) == 0:
+        print("No statistics returned. Skipping Flightera update.")
+        return
+
+    # Step 3: Aggregate to BITRE format
+    print(f"Aggregating to BITRE-compatible format...")
+    df_bitre = _aggregate_to_bitre_format(df_stats, df_flnr, year_month)
+    if len(df_bitre) == 0:
+        print("No airline-routes with enough flights. Skipping Flightera update.")
+        return
+
+    # Step 4: Merge weather + holidays and append to training data
+    print(f"Merging with weather and holiday features...")
+    training_path = os.path.join(DATA_PROCESSED, 'ml_training_data_multiroute_hols.csv')
+    df_train = pd.read_csv(training_path)
+
+    existing = (df_train['year_month'] == year_month).sum()
+    if existing:
+        print(f"  Replacing {existing} existing rows for {year_month}")
+    df_train_clean = df_train[df_train['year_month'] != year_month].copy()
+
+    # Merge weather features
+    def _prepare_weather(city, suffix):
+        code = CITY_MAPPING[city]
+        path = os.path.join(DATA_PROCESSED, f'features_{code}.csv')
+        df = pd.read_csv(path)
+        rename = {col: f"{col}{suffix}" for col in df.columns if col != 'year_month'}
+        return df.rename(columns=rename)
+
+    weather_dep = {city: _prepare_weather(city, '_dep') for city in cities}
+    weather_arr = {city: _prepare_weather(city, '_arr') for city in cities}
+
+    merged_parts = []
+    for dep_city, arr_city in permutations(cities, 2):
+        mask = (df_bitre['departing_port'] == dep_city) & (df_bitre['arriving_port'] == arr_city)
+        df_route = df_bitre[mask].copy()
+        if len(df_route) == 0:
+            continue
+        df_route = df_route.merge(weather_dep[dep_city], on='year_month', how='left')
+        df_route = df_route.merge(weather_arr[arr_city], on='year_month', how='left')
+        merged_parts.append(df_route)
+
+    if merged_parts:
+        df_new = pd.concat(merged_parts, ignore_index=True)
+    else:
+        df_new = df_bitre.copy()
+
+    # Add holiday features
+    df_new['year_month_dt'] = pd.to_datetime(df_new['year_month'])
+    df_new['month_num'] = df_new['year_month_dt'].dt.month
+    df_new['year'] = df_new['year'].astype(int)
+    df_holidays = compute_holiday_features([int(year)])
+    df_new = df_new.merge(df_holidays, on=['year', 'month_num'], how='left')
+
+    # Align columns and append
+    for col in df_train_clean.columns:
+        if col not in df_new.columns:
+            df_new[col] = np.nan
+    df_new = df_new[df_train_clean.columns]
+
+    df_combined = pd.concat([df_train_clean, df_new], ignore_index=True)
+    df_combined = df_combined.sort_values(
+        ['year_month', 'airline', 'departing_port', 'arriving_port']
+    ).reset_index(drop=True)
+
+    df_combined.to_csv(training_path, index=False)
+    print(f"  Training data updated: {len(df_combined)} rows ({len(df_new)} new for {year_month})")
+
+
+# ===========================================================================
+# 7. Full Data Update Pipeline
 # ===========================================================================
 
 def update_all_data(cities=None):
@@ -650,13 +1003,29 @@ def update_all_data(cities=None):
     print("=" * 80)
     prepare_training_data(cities=cities, bitre_file=bitre_file)
 
+    # Step 5: Fetch latest month via Flightera API
+    print("\n" + "=" * 80)
+    print("STEP 5: Fetching latest flight data from Flightera API...")
+    print("=" * 80)
+    try:
+        prev = datetime.now().replace(day=1) - relativedelta(months=1)
+        target_ym = prev.strftime('%Y-%m')
+        training_path = os.path.join(DATA_PROCESSED, 'ml_training_data_multiroute_hols.csv')
+        df_check = pd.read_csv(training_path, usecols=['year_month'])
+        if (df_check['year_month'] == target_ym).any():
+            print(f"  {target_ym} already present in training data. Skipping Flightera update.")
+        else:
+            append_flightera_data(target_ym, cities=cities)
+    except Exception as e:
+        print(f"Flightera update skipped: {e}")
+
     print("\n" + "=" * 80)
     print("Data update complete.")
     print("=" * 80)
 
 
 # ===========================================================================
-# 7. Model and Data Loading (for Streamlit app)
+# 8. Model and Data Loading (for Streamlit app)
 # ===========================================================================
 
 def load_models(models_dir=None):

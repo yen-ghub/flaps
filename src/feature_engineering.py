@@ -407,14 +407,14 @@ def split_data(df, feature_names):
 
     Train: 2010-2017 + 2023
     Val:   2018 + 2024
-    Test:  2019 + 2025+
+    Test:  2019 + 2025 + Jan 2026
 
     Returns dict with X_train, X_val, X_test, y_train_reg, y_val_reg, y_test_reg,
     y_train_clf, y_val_clf, y_test_clf, and the boolean masks.
     """
     train_mask = (((df['year'] >= 2010) & (df['year'] <= 2017)) | (df['year'] == 2023))
     val_mask = ((df['year'] == 2018) | (df['year'] == 2024))
-    test_mask = ((df['year'] == 2019) | (df['year'] >= 2025))
+    test_mask = ((df['year'] == 2019) | (df['year'] == 2025) | ((df['year'] == 2026) & (df['month'] == 1)))
 
     X_train = df.loc[train_mask, feature_names].values
     X_val = df.loc[val_mask, feature_names].values

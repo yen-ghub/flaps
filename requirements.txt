@@ -10,4 +10,5 @@ requests==2.32.5
 openpyxl==3.1.5
 joblib==1.5.3
 python-dateutil==2.9.0.post0
+python-dotenv
 tensorflow==2.20.0
