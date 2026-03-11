@@ -294,7 +294,10 @@ with st.container(border=True):
         )
 
     route_df = df[df['route'] == selected_route]
-    route_airlines = sorted(route_df['airline'].unique().tolist())
+    route_airlines = sorted(
+        a for a in route_df['airline'].unique()
+        if a not in ('Virgin Australia Regional Airlines', 'Rex Airlines', 'Regional Express', 'Tigerair Australia')
+    )
 
     with brief_cols[1]:
         selected_airline = st.selectbox("Airline", options=route_airlines)
@@ -433,9 +436,9 @@ st.subheader("Predictions")
 st.markdown("**Delay rate**")
 st.caption("Percentage of delayed flights in the selected month")
 
-reg_items = [("Ridge ★", preds['ridge']), ("Random Forest", preds['rf'])]
+reg_items = [("Ridge", preds['ridge']), ("Random Forest", preds['rf'])]
 if has_nn and preds['nn_reg'] is not None:
-    reg_items.append(("Neural Network", preds['nn_reg']))
+    reg_items.append(("Neural Network ★", preds['nn_reg']))
 
 cols = st.columns(len(reg_items) + 1)
 for i, (name, pred) in enumerate(reg_items):
@@ -448,7 +451,7 @@ for i, (name, pred) in enumerate(reg_items):
 
 with cols[-1]:
     if is_future:
-        actual_dr_display = '<span style="font-size:2rem">Not available yet</span>'
+        actual_dr_display = "N/A"
     else:
         actual_dr_display = f"{actual_delay_rate:.1%}"
     st.markdown(
@@ -487,7 +490,7 @@ for i, (name, proba) in enumerate(clf_items):
 
 with cols[-1]:
     if is_future:
-        actual_hd_display = '<span style="font-size:2rem">Not available yet</span>'
+        actual_hd_display = "N/A"
     else:
         actual_hd_display = "Yes" if actual_is_high else "No"
     st.markdown(

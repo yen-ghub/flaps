@@ -9,7 +9,6 @@ from html import escape
 
 import joblib
 import streamlit as st
-import tensorflow as tf
 from src.ui_theme import apply_theme
 
 
@@ -119,7 +118,7 @@ apply_theme(
 )
 st.title("Model Details")
 st.markdown("""
-            The top 3 machine learning models the nowcasting and forecasting approaches, when considering both the performance metrics and interpretability, are discussed in further detail below.
+            The top 3 machine learning models for the nowcasting and forecasting approaches, when considering both the performance metrics and interpretability, are discussed in further detail below.
             """)
 
 COL = {
@@ -148,6 +147,7 @@ def load_joblib_model(path):
 
 @st.cache_resource
 def load_keras_model(path):
+    import tensorflow as tf
     return tf.keras.models.load_model(path, compile=False)
 
 
@@ -231,14 +231,15 @@ except FileNotFoundError as e:
 st.markdown("### 1. For Regression Nowcasting: Ridge")
 st.markdown("This is the best regression model (i.e. in predicting the percentage of delayed flights) under the nowcasting approach.  \n"
             "One of the aims of the nowcasting approach is to ascertain the dominant features, which requires the model to be easily interpretable.  \n"
-            "Thus, while its accuracy (_R²_ = 0.5172) is slightly lower than the more complex models line Neural Network (_R²_ = 0.5427), this trade-off is justifiable due to its high interpretability.")
+            "Thus, while its accuracy (_R²_ = 0.5172) is slightly lower than the more complex models like Neural Network (_R²_ = 0.5427), this trade-off is justifiable due to its high interpretability.")
 
 # Plot the flowchart
-st.markdown("Figure 1 visualises the schematic workflow of the Ridge model to predict the delay rate.  \n"
-            "The parameters of this model are the weighting coefficients, _w_, and the biases, _b_.")
+st.markdown("Figure 1 visualises the schematic workflow of the delay rate prediction using the Ridge model.  \n"
+            "The parameters of this model are the weighting coefficients, _w_, and the biases, _b_; one pair of _w_ and _b_ for each feature.  \n"
+            "The linearity of this model (no interaction between features), is the reason for its interpretability.")
 image_path = os.path.join(PROJECT_ROOT, "app", "images", "diagram_linear.svg")
 st.image(image_path, width=480)
-st.caption("**Figure 1.** The schematic workflow diagram of the Ridge model.")
+st.caption("**Figure 1.** Schematic diagram of the prediction workflow using Ridge model.")
 st.space('small')
 
 
@@ -313,18 +314,18 @@ def _ridge_coef_section(models_dir, metadata, max_abs=None):
                     "Rank": rank,
                     "Feature": row["Feature"],
                     "Description": _FEATURE_DESCRIPTIONS.get(row["Feature"], "—"),
-                    "Coefficient": _svg_bar(row["Coefficient"], max_abs),
+                    "Weight Coefficient": _svg_bar(row["Coefficient"], max_abs),
                 })
 
             # Render table with raw HTML in the Coefficient cell (skip escaping for that col)
-            columns = ["Rank", "Feature", "Description", "Coefficient"]
+            columns = ["Rank", "Feature", "Description", "Weight Coefficient"]
             header_html = "".join(f"<th>{escape(col)}</th>" for col in columns)
             body_rows = []
             for row in table_rows:
                 cells = []
                 for col in columns:
                     val = row.get(col, "")
-                    if col == "Coefficient":
+                    if col == "Weight Coefficient":
                         cells.append(f"<td style='text-align:center;padding:0.46rem 0.62rem;'>{val}</td>")
                     else:
                         cells.append(f"<td>{escape(' '.join(str(val).split()))}</td>")
@@ -347,12 +348,12 @@ def _ridge_coef_section(models_dir, metadata, max_abs=None):
         st.error("Failed to render Ridge coefficients.")
         st.code(str(exc), language="text")
 
-st.markdown("#### Model interpretation")
-st.markdown("Since the model input features are normalised, the linear regression models can be interpreted by inspecting _w_, where:  \n"
+#st.markdown("#### Model interpretation")
+st.markdown("Since the input features are normalised, the relative contribution of each feature can be deduced by inspecting _w_, where:  \n"
             "- a larger _positive_ weight indicates that the feature contributes more to increase the delay rate;  \n"
             "- conversely, a larger _negative_ weight indicates the feature contributes more to _decrease_ the delay rate.  \n"
             )
-st.markdown("The 10 most dominant features under the nowcasting approach are presented in Table 1 below.")
+st.markdown("The 10 most dominant features and their respective coefficients under the nowcasting approach are presented in Table 1 below.")
 
 def _top10_max_abs(models_dir, metadata):
     try:
@@ -370,8 +371,8 @@ def _top10_max_abs(models_dir, metadata):
 
 
 # Plot the feature tables
-st.space('small')
-st.caption("**Table.1** The top 10 features contributing to the current months delay rate.")
+#st.space('small')
+st.caption("**Table.1** The top 10 features contributing to the current months delay rate and their respective weight coefficients.")
 _ridge_coef_section(NOWCASTING_MODELS_DIR, now_metadata)
 st.space('small')
 # st.markdown("**FORECASTING**")
@@ -381,8 +382,8 @@ st.markdown("It is observed that:  \n"
             "- For the strongest positive feature, `delay_rate_lag1`: when the delay rate is high in a particular month, it is likely to remain high in the next month as well.  \n"
             "   _This may suggest persisting operational problems, such as crew shortage or unplanned maintenance issues._  \n"
             "- For the strongest negative feature, `delay_rate_gradient`: when delay rate has been worsening month-to-month, it improves the likelihood that it will be lower the next month.  \n"
-            "   _This may indicate that arlines notice the worsening trend, and then take appropriate measures to combat the problem._"           
-            )   
+            "   _This may indicate that airlines notice the worsening trend, and then take appropriate measures to combat the problem._"
+            )
 
 ###
 
@@ -391,10 +392,10 @@ st.divider()
 st.markdown("### 2. For Classification Nowcasting and Forecasting: XGBoost")
 st.markdown("This is the best classification model (i.e. in predicting if it is a high delay rate month) under both the nowcasting and forecasting approaches.  \n"
             "Its accuracy (_F1_ = 0.7525 for nowcasting, _F1_ = 0.7415 for forecasting) is slightly lower than the Neural Network model (_F1_ = 0.7618 for nowcasting, _F1_ = 0.7620 for forecasting).  \n"
-            "However, after inspecting the accuracy breakdown, XGBoost exhibits the best balance between _precision_ (a measure of how well the model avoids false positive) and _recall_ (how well the model avoids false negative)."
+            "However, after inspecting the accuracy breakdown, XGBoost exhibits the best balance between _precision_ (a measure of how well the model avoids false positives) and _recall_ (how well the model avoids false negatives)."
             )
 st.markdown("For example, the precision and recall for the XGBoost model are both moderately high at 0.7475 and 0.7357, respectively, while the corresponding values for the Neural Network model are imbalanced at 0.6744 and 0.8757.  \n"
-            "The lower recall score means the model is prone to classifying a month as high delay even it is not the case, which is not desirable as it may lead to unnecessary additional spending in anticipation of the high delay."
+            "The lower precision score means the model is prone to classifying a month as high delay even when it is not the case, which is not desirable as it may lead to unnecessary additional spending in anticipation of the high delay."
             )
 st.markdown("")
 
@@ -410,7 +411,7 @@ try:
 
     image_path = os.path.join(PROJECT_ROOT, "app", "images", "diagram_xgb.svg")
     st.image(image_path, width=500)
-    st.caption("**Figure 2**. The schematic workflow of the XGBoost model.")
+    st.caption("**Figure 2**. Schematic diagram of the prediction workflow using XGBoost model.")
 
     st.space('small')
     st.markdown("The hyperparameters of the XGBoost models, shown in Table 2 below, are obtained from the fine-tuning process using the validation dataset."
@@ -440,7 +441,7 @@ except Exception as exc:
 st.divider()
 st.subheader("3. For Regression Forecasting: Neural Network Models")
 st.markdown("This is the best regression model under the forecasting approach, because it has the highest accuracy (_R²_ = 0.5096) vs the other two models (_R²_ = 0.4931 and 0.5052).  \n"
-    "Unlike the nowcasting approach (where intrepretibility is important), the accuracy of prediction is the main priority when forecasting for the upcoming month.")
+    "Unlike the nowcasting approach (where interpretability is important), the accuracy of prediction is the main priority when forecasting for the upcoming month.")
 st.markdown("The neural network architecture used to predict the delay rate under the nowcasting and forecasting approaches (identical in both) are presented in Table 3 as a list of the employed neural network layers."
             )
 try:

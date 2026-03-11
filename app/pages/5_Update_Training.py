@@ -17,10 +17,10 @@ from src.ui_theme import apply_theme
 st.set_page_config(page_title="FLAPS — Update & Train", page_icon="✈️", layout="wide")
 apply_theme()
 st.title("Update and Re-train")
-st.markdown(
-    "Download the latest data from BOM, BITRE, and Flightera, then retrain models. "
-    "Each operation may take several minutes."
-)
+st.markdown("""
+            Download the latest data from BOM, BITRE, and Flightera, then retrain models.  
+            If new data is available, the full data update process may take up to half an hour due to API request rate limitation.
+            """)
 
 _training_path = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'processed', 'ml_training_data_multiroute_hols.csv')
 if os.path.exists(_training_path):

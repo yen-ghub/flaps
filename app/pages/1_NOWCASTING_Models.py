@@ -140,7 +140,10 @@ with st.container(border=True):
 
     # Airline options depend on selected route
     route_df = df[df['route'] == selected_route]
-    route_airlines = sorted(route_df['airline'].unique().tolist())
+    route_airlines = sorted(
+        a for a in route_df['airline'].unique()
+        if a not in ('Virgin Australia Regional Airlines', 'Rex Airlines', 'Regional Express', 'Tigerair Australia')
+    )
 
     # Airline selectbox — second column
     with brief_cols[1]:
