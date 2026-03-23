@@ -992,27 +992,50 @@ def update_all_data(cities=None):
         compute_weather_features(code)
 
     # Step 3: Download BITRE flight data
+    # BITRE publishes data ~6 weeks after month end. In the first 3 weeks of the current
+    # month, the previous month's data is not yet available — skip if training data already
+    # contains the latest month that BITRE would have (2 months ago).
     print("\n" + "=" * 80)
     print("STEP 3: Downloading BITRE flight data...")
     print("=" * 80)
-    bitre_file = download_bitre_data()
+    _bitre_expected_ym = (datetime.now().replace(day=1) - relativedelta(months=2)).strftime('%Y-%m')
+    _bitre_skip = False
+    _training_path_pre = os.path.join(DATA_PROCESSED, 'ml_training_data_multiroute_hols.csv')
+    if datetime.now().day <= 21 and os.path.exists(_training_path_pre):
+        _df_bitre_check = pd.read_csv(_training_path_pre, usecols=['year_month'])
+        if (_df_bitre_check['year_month'] == _bitre_expected_ym).any():
+            _bitre_skip = True
+            print(f"  Training data already contains {_bitre_expected_ym} (latest expected BITRE month). Skipping BITRE download and merge.")
+
+    if _bitre_skip:
+        bitre_file = None
+    else:
+        bitre_file = download_bitre_data()
+
+    # Check BEFORE Step 4 overwrites the CSV whether the target month is already present.
+    prev = datetime.now().replace(day=1) - relativedelta(months=1)
+    target_ym = prev.strftime('%Y-%m')
+    _training_path = os.path.join(DATA_PROCESSED, 'ml_training_data_multiroute_hols.csv')
+    _flightera_skip = False
+    if os.path.exists(_training_path):
+        _df_check = pd.read_csv(_training_path, usecols=['year_month'])
+        _flightera_skip = (_df_check['year_month'] == target_ym).any()
 
     # Step 4: Merge into training data
     print("\n" + "=" * 80)
     print("STEP 4: Preparing training data...")
     print("=" * 80)
-    prepare_training_data(cities=cities, bitre_file=bitre_file)
+    if _bitre_skip:
+        print(f"  Skipping — BITRE data is already up to date.")
+    else:
+        prepare_training_data(cities=cities, bitre_file=bitre_file)
 
     # Step 5: Fetch latest month via Flightera API
     print("\n" + "=" * 80)
     print("STEP 5: Fetching latest flight data from Flightera API...")
     print("=" * 80)
     try:
-        prev = datetime.now().replace(day=1) - relativedelta(months=1)
-        target_ym = prev.strftime('%Y-%m')
-        training_path = os.path.join(DATA_PROCESSED, 'ml_training_data_multiroute_hols.csv')
-        df_check = pd.read_csv(training_path, usecols=['year_month'])
-        if (df_check['year_month'] == target_ym).any():
+        if _flightera_skip:
             print(f"  {target_ym} already present in training data. Skipping Flightera update.")
         else:
             append_flightera_data(target_ym, cities=cities)
