@@ -115,10 +115,13 @@ st.markdown(
 )
 st.title("FORECASTING")
 st.markdown(
-    "Forecasting predicts the delay rate using data up until the month prior (i.e. no real-time data from the selected month is used)."
-)
-st.markdown(
-    "_*The actual delay rate is shown for comparison purposes only and is not used in making any predictions._"
+    """
+    Forecasting predicts the delay rate of the current month, using data up until the month prior (i.e. no real-time data from the selected month is used).
+
+    For example: when data is available up to February 2026, Forecasting prediction is available up to March 2026.
+
+    _*The \"Actual Delay Rate\" is shown for comparison purposes only and is not used in making any predictions._
+    """
 )
 
 

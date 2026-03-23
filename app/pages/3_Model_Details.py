@@ -420,12 +420,12 @@ try:
                 )
     render_swiss_table(
         [
-            {"Parameter": "n_estimators", "Value": n_estimators},
-            {"Parameter": "max_depth", "Value": max_depth},
-            {"Parameter": "learning_rate", "Value": learning_rate},
-            {"Parameter": "min_child_weight", "Value": min_child_weight},
+            {"Hyperparameter": "n_estimators", "Value": n_estimators},
+            {"Hyperparameter": "max_depth", "Value": max_depth},
+            {"Hyperparameter": "learning_rate", "Value": learning_rate},
+            {"Hyperparameter": "min_child_weight", "Value": min_child_weight},
         ],
-        columns=["Parameter", "Value"],
+        columns=["Hyperparameter", "Value"],
         table_class="swiss-table swiss-table-tight",
     )
 except FileNotFoundError:

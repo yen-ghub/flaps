@@ -82,10 +82,14 @@ st.markdown(
 )
 st.title("NOWCASTING")
 st.markdown(
-    "NOWCASTING predicts the delay rate by using real-time data (i.e. up to and including the selected month itself). "
+    """
+    NOWCASTING predicts the delay rate by using real-time data (i.e. up to and including the selected month itself) and therefore cannot predict ahead of time.
+
+    For example: when data is available up to February 2026, Nowcasting prediction is only available up to February 2026.
+    """
 )
 st.markdown(
-    "_*The actual delay rate is shown for comparison purposes only and is not used in making any predictions._"
+    "_*The \"Actual Delay Rate\" is shown for comparison purposes only and is not used in making any predictions._"
 )
 
 # Streamlit re-runs the entire script with every interaction (any click, dropdown, slider, etc.)

@@ -83,8 +83,9 @@ st.divider()
 st.subheader('Why')
 st.markdown("""
             The on-time performance of Australian domestic flights used to be at 81% (over the 2010-2019 period).  
-
-            Surprisingly, it declined to 63-68% in 2023-2024. What is going on?  
+            Surprisingly, it declined to 63-68% in 2023-2024.
+            
+            What is going on?  
 
             On the premise that better predictions could lead to better planning for airlines and airports, the idea for Project FLAPS (Flight Lateness Australia Prediction System) was born. 
             """)
@@ -109,8 +110,8 @@ st.subheader('How')
 st.markdown("""  
             Based on the above, Project FLAPS set out to build machine learning models to predict the monthly delay rates on Australian domestic flight routes, as a proof-of-concept.
             """)
-# st.space('xxsmall')
-st.markdown("  \n")
+# st.space('small')
+# st.markdown("  \n")
 st.markdown("##### General")
 st.markdown("""
             Firstly, 7 machine learning models were selected based on their level of complexity, consisting of:
@@ -138,7 +139,7 @@ st.markdown("""
             1. **Nowcasting approach** 
                 - The purpose of this approach is to aid with model selection and identification of dominant features.  
                 - No forecast will be made for the current month.
-                - This approach uses real-time data (i.e. [explain general meaning or description of technique briefly]) and is only applied to previous months where data is available.
+                - This approach uses real-time data (i.e. applying the model to a completed month using that month's own data, rather than predicting ahead) and thus is only applicable to previous months where data is available.
                 - Accordingly, each of the 7 machine learning models will utilise data up until the previous month to provide insight on the previous month's flight delays.
                 - For example: each model uses data up until January 2026 to _provide insight on_ January 2026's delays itself.
             2. **Forecasting approach**
@@ -172,11 +173,18 @@ st.markdown("""
                 When relying solely on good precision, there is a potential risk the model _predicts a high-delay month only when it is very certain_ and misses out on many actual high-delay months.  
                 On the other hand, when relying solely on good recall, there is a potential risk that the model _predicts a high-delay month even when it is not certain_ in order to avoid missing out.  
                 In general, a reliable model needs to have a good balance of both.
-            - For **regression forecasting**: Neural Network.
+            - For **regression forecasting**: Neural Network. 
                 It gives the best accuracy out of all the regression models under the forecasting approach.  
                 The model is more complex and less interpretable, but this trade-off is acceptable because the priority of the forecasting approach is the prediction accuracy.
             """)
 
+st.markdown("  \n")
+st.markdown("""
+            ##### Tech Stack
+
+            Python · pandas · scikit-learn · XGBoost · TensorFlow/Keras · Jupyter · Streamlit · Docker · Google Cloud Run
+            """
+            )
 
 st.divider()
 
@@ -191,7 +199,7 @@ def _skill(header, description):
     )
 
 _skills_left = [
-    ("Data acquisition",                  "Development of automated pipelines to collect and combine data from multiple acquisition methods and sources: FTP for BOM data, webpage link for BITRE data and API request for Flightera data."),
+    ("Data acquisition",                  "Development of automated pipelines to collect and combine data from multiple acquisition methods and sources: FTP for BOM data, webpage link for BITRE data and REST API for Flightera data."),
     ("Feature engineering",               "Hand-engineered and encoded features, including weather, holidays, past delay rates, and seasonality."),
     ("Hypothesis-driven experimentation", "Systematic feature evaluation, which is documented step-by-step in Jupyter notebooks."),
     ("Time-series validation",            "Training, validation and testing data stratification between pre- and post-Covid periods, to prevent temporal leakage."),
@@ -201,7 +209,7 @@ _skills_right = [
     ("Model evaluation",      "Performance comparison of 7 machine learning models and validation against baseline benchmarks."),
     ("Problem diagnosis",     "Identification of root cause when the model performance deteriorates, e.g. filtering out low-volume flights because their data is inherently too noisy for prediction."),
     ("Trade-off consideration","Preference for simpler models when the added complexity of more sophisticated models does not justify the gains."),
-    ("End-to-end deployment", "From raw data to web-deployed interactive application"),
+    ("End-to-end deployment", "From raw data nteractive web application deployed on Google Cloud Run."),
 ]
 
 col_a, col_b = st.columns(2)
