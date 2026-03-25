@@ -161,7 +161,7 @@ st.markdown("""
             ##### Best Overall Models
 
             Depending on the approach (nowcasting or forecasting) and the type of prediction (regression or classification), there are three best overall models identified.  
-            Each of these models are briefly described below and discussed in further detail on the [Model Details](Model_Details) page:
+            Each of these models are briefly described below:
             - For **regression nowcasting**: Ridge.  
                 It is a simple linear model, but the performance is still comparable to the more complex non-linear models.  
                 Although there is a small sacrifice in accuracy, it is worth the trade-off in higher interpretability -- which is a priority in the nowcasting approach.
@@ -176,6 +176,8 @@ st.markdown("""
             - For **regression forecasting**: Neural Network. 
                 It gives the best accuracy out of all the regression models under the forecasting approach.  
                 The model is more complex and less interpretable, but this trade-off is acceptable because the priority of the forecasting approach is the prediction accuracy.
+            
+            These models are discussed in further detail on the [Model Details](Model_Details) page and evaluated on the [Model Evaluation](Model_Evaluation) page.
             """)
 
 st.markdown("  \n")
@@ -209,7 +211,7 @@ _skills_right = [
     ("Model evaluation",      "Performance comparison of 7 machine learning models and validation against baseline benchmarks."),
     ("Problem diagnosis",     "Identification of root cause when the model performance deteriorates, e.g. filtering out low-volume flights because their data is inherently too noisy for prediction."),
     ("Trade-off consideration","Preference for simpler models when the added complexity of more sophisticated models does not justify the gains."),
-    ("End-to-end deployment", "From raw data nteractive web application deployed on Google Cloud Run."),
+    ("End-to-end deployment", "From raw data to interactive web application deployed on Google Cloud Run."),
 ]
 
 col_a, col_b = st.columns(2)

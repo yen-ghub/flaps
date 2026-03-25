@@ -1,5 +1,5 @@
 """
-Model performance dashboard.
+Model evaluation dashboard.
 Displays evaluation metrics, baseline comparisons, and route-level analysis.
 """
 
@@ -65,9 +65,9 @@ apply_theme(
     }
     """
 )
-st.title("Model Performance")
+st.title("Model Evaluation")
 st.markdown(
-    "In order to assess the quality of the models, a number of performance metrics are computed and presented below."
+    "In order to assess the quality of the models, a number of evaluation metrics are computed and presented below."
 )
 
 COL = {
@@ -180,6 +180,18 @@ def get_forecasting_full_predictions():
         return json.load(f)
 
 
+@st.cache_data
+def get_airline_lookup():
+    """Return dict (year_month, route, delay_rate_rounded) -> airline from training CSV."""
+    from src.data_loader import PROJECT_ROOT
+    csv_path = os.path.join(PROJECT_ROOT, 'data', 'processed', 'ml_training_data_multiroute_hols.csv')
+    df = pd.read_csv(csv_path, usecols=['year_month', 'departing_port', 'arriving_port', 'airline',
+                                        'sectors_flown', 'arrivals_on_time'])
+    df['route'] = df['departing_port'] + '_' + df['arriving_port']
+    df['delay_rate'] = ((df['sectors_flown'] - df['arrivals_on_time']) / df['sectors_flown']).round(10)
+    return df.set_index(['year_month', 'route', 'delay_rate'])['airline'].to_dict()
+
+
 metadata = get_metadata()
 fmetadata = get_forecasting_metadata()
 preds = get_test_predictions()
@@ -188,6 +200,7 @@ fpreds = get_forecasting_test_predictions()
 ffull_preds = get_forecasting_full_predictions() if os.path.exists(
     os.path.join(FORECASTING_MODELS_DIR, 'full_predictions.json')
 ) else None
+airline_lookup = get_airline_lookup()
 
 st.divider()
 
@@ -546,102 +559,177 @@ if fig_cm_fore is not None:
 
 
 # ____________________________________
-# ---- 3. Route-Level Performance ----
-# st.subheader("3. Route-Level Performance")
+# ---- 4. Route-Level Performance ----
+st.divider()
+st.subheader("4. Route-Level Performance")
 
-# st.markdown("""
-#             The predictive performance of the models varies depending on the route.
+st.markdown("""
+            The prediction accuracy of the models varies depending on the route.
+
+            There are two factors affecting the route-specific accuracy:
+            - inherent volatility: some routes exhibit greater delay rate volatility throughout the historical record, reducing the predictability of the underlying signal;
+            - flight volume: routes with fewer than 50 flights per month exhibit high delay rate volatility, where a single delayed flight can shift the monthly rate by several percentage points.  
             
-#             The chart below breaks down the accuracy of the Ridge model for each flight route.
-#             """)
+            Figure 9 compares the R² values of the predictions made for each route under the nowcasting (Ridge) and the forecasting (Neural Network) approaches.  
+            
+            """)
 
-# # Build nowcasting route DataFrame, sorted by Ridge R²
-# route_data = []
-# for route, m in metadata['route_metrics'].items():
-#     route_data.append({
-#         'Route': route.replace('_', ' \u2192 '),
-#         'Ridge R²': m['ridge_r2'],
-#         'RF R²': m['rf_r2'],
-#         'Lag1 R²': m['lag1_r2'],
-#     })
-# route_df = pd.DataFrame(route_data).sort_values('Ridge R²', ascending=True)
+# Build forecasting route DataFrame, sorted by Ridge R² (used as sort order)
+froute_data = []
+for route, m in fmetadata['route_metrics'].items():
+    froute_data.append({
+        'Route': route.replace('_', ' \u2192 '),
+        'Ridge R²': m['ridge_r2'],
+        'RF R²': m['rf_r2'],
+        'Lag1 R²': m['lag1_r2'],
+    })
+froute_df = pd.DataFrame(froute_data).sort_values('Ridge R²', ascending=True)
 
-# # Build forecasting route DataFrame, aligned to same route order
-# froute_data = []
-# for route, m in fmetadata['route_metrics'].items():
-#     froute_data.append({
-#         'Route': route.replace('_', ' \u2192 '),
-#         'Ridge R²': m['ridge_r2'],
-#         'RF R²': m['rf_r2'],
-#         'Lag1 R²': m['lag1_r2'],
-#     })
-# froute_df = pd.DataFrame(froute_data)
-# froute_df = froute_df.set_index('Route').reindex(route_df['Route']).reset_index()
+# Build nowcasting route DataFrame, aligned to forecasting sort order
+route_data = []
+for route, m in metadata['route_metrics'].items():
+    route_data.append({
+        'Route': route.replace('_', ' \u2192 '),
+        'Ridge R²': m['ridge_r2'],
+        'RF R²': m['rf_r2'],
+        'Lag1 R²': m['lag1_r2'],
+    })
+route_df = pd.DataFrame(route_data)
+route_df = route_df.set_index('Route').reindex(froute_df['Route']).reset_index()
 
-# fig = go.Figure()
-# fig.add_trace(go.Bar(
-#     y=route_df['Route'], x=route_df['Ridge R²'],
-#     orientation='h', name='NOWCASTING',
-#     marker_color=COL["ridge"],
-# ))
-# fig.add_trace(go.Bar(
-#     y=froute_df['Route'], x=froute_df['Ridge R²'],
-#     orientation='h', name='FORECASTING',
-#     marker_color='#ff7f00',
-# ))
-# fig.update_layout(
-#     barmode='group',
-#     bargap=0.35,
-#     bargroupgap=0.08,
-#     title="Ridge R² by Route",
-#     xaxis_title="R²",
-# )
-# style_plot(fig, height=600)
-# col_chart, _ = st.columns([2, 1])
-# with col_chart:
-#     st.plotly_chart(fig, use_container_width=True)
+fig_route = go.Figure()
+fig_route.add_trace(go.Bar(
+    y=froute_df['Route'], x=froute_df['Ridge R²'],
+    orientation='h', name='Forecasting',
+    marker_color='#ff7f00',
+    offsetgroup=1,
+))
+fig_route.add_trace(go.Bar(
+    y=route_df['Route'], x=route_df['Ridge R²'],
+    orientation='h', name='Nowcasting',
+    marker_color=COL["ridge"],
+    offsetgroup=0,
+))
+fig_route.update_layout(
+    barmode='group',
+    bargap=0.35,
+    bargroupgap=0.08,
+    title="",
+    xaxis_title="R²",
+    xaxis=dict(range=[min(route_df['Ridge R²'].min(), froute_df['Ridge R²'].min()) - 0.05, 0.85]),
+)
+style_plot(fig_route, height=max(420, len(route_df) * 40))
+col_chart, _ = st.columns([3, 1])
+with col_chart:
+    st.plotly_chart(fig_route, use_container_width=True)
+st.caption("**Figure 9.** Comparison of delay rate prediction accuracy (R²) by route, comparing nowcasting (Ridge) and forecasting (Neural Network) approaches.")
 
-# st.divider()
+st.divider()
 
+# ___________________________________
+# ---- 5. Error Analysis ----
+st.subheader("5. Error Analysis")
 
-#st.markdown("**Correlations**")
+st.markdown("""
+            This section investigates the residuals (prediction errors) of the forecasting Neural Network model on the test dataset: examining the residual histogram distribution and the worst-predicted routes.  
+            Residuals are defined as (_predicted delay rate_ − _actual delay rate_), such that a posive residual value indicates that the model is overpredicting the delay rate and vice versa.
+            """)
 
-# # Plot actual vs prediction correlations
-# n_cols = 3 if nn_preds is not None else 2
-# subplot_titles = [f"Ridge (R² = {_ridge_r2:.3f})", f"Random Forest (R² = {_rf_r2:.3f})"]
-# if nn_preds is not None:
-#     subplot_titles.append(f"Neural Network (R² = {_nn_r2:.3f})")
+# Build error DataFrame from forecasting test predictions
+_f_y_true = np.array(fpreds['y_true_reg'])
+_f_nn_pred = np.array(fpreds['nn_reg_pred'])
+_f_residuals = _f_nn_pred - _f_y_true
+_f_abs_errors = np.abs(_f_residuals)
 
-# fig = make_subplots(rows=1, cols=n_cols, subplot_titles=subplot_titles)
-# fig.add_trace(go.Scatter(
-#     x=y_true, y=ridge_preds, mode='markers',
-#     marker=dict(size=4, opacity=0.45, color=_ridge_color),
-#     name='Ridge', showlegend=False,
-# ), row=1, col=1)
-# fig.add_trace(go.Scatter(
-#     x=y_true, y=rf_preds, mode='markers',
-#     marker=dict(size=4, opacity=0.45, color=COL["rf"]),
-#     name='RF', showlegend=False,
-# ), row=1, col=2)
-# if nn_preds is not None:
-#     fig.add_trace(go.Scatter(
-#         x=y_true, y=nn_preds, mode='markers',
-#         marker=dict(size=4, opacity=0.45, color=COL["nn"]),
-#         name='NN', showlegend=False,
-#     ), row=1, col=3)
-# for col in range(1, n_cols + 1):
-#     fig.add_trace(go.Scatter(
-#         x=[0, 0.6], y=[0, 0.6], mode='lines',
-#         line=dict(color=COL["baseline_lag1"], dash='dash'), showlegend=False,
-#     ), row=1, col=col)
-#     fig.update_xaxes(title_text="Actual Delay Rate", range=[0, 0.6], row=1, col=col)
-#     fig.update_yaxes(title_text="Predicted Delay Rate", range=[0, 0.6], row=1, col=col)
-# fig.update_layout(
-#     title="Correlations"
-# )
-# style_plot(fig, height=450)
-# st.plotly_chart(fig, use_container_width=True)
+# Recover year_month by matching (y_true, ridge_pred) pairs against full_predictions
+_ffull_ym_lookup = {
+    (round(y, 10), round(r, 10)): ym
+    for ym, s, y, r in zip(ffull_preds['year_month'], ffull_preds['split'], ffull_preds['y_true_reg'], ffull_preds['ridge_pred'])
+    if s == 'test'
+} if ffull_preds is not None else {}
+_f_year_months = [
+    _ffull_ym_lookup.get((round(y, 10), round(r, 10)), '')
+    for y, r in zip(fpreds['y_true_reg'], fpreds['ridge_pred'])
+]
 
-# st.space('medium')
+_f_airlines = [
+    airline_lookup.get((ym, route, round(y, 10)), '')
+    for ym, route, y in zip(_f_year_months, fpreds['routes'], fpreds['y_true_reg'])
+]
+
+ferr_df = pd.DataFrame({
+    'year_month': _f_year_months,
+    'route': [r.replace('_', ' → ') for r in fpreds['routes']],
+    'airline': _f_airlines,
+    'actual': _f_y_true,
+    'predicted': _f_nn_pred,
+    'residual': _f_residuals,
+    'abs_error': _f_abs_errors,
+})
+
+_f_mean_residual = float(_f_residuals.mean())
+_f_bias_dir = "over-prediction" if _f_mean_residual > 0 else "under-prediction"
+
+# ---- 5a. Residual distribution ----
+st.markdown("""
+            #### Residual histogram
+
+            Figure 10 shows the histogram of the residual, where the distribution is roughly symmetric around zero, with no pronounced tail in either direction.  
+            This indicates that the prediction model is well-calibrated, as a non-zero mean indicates a systematic bias is present.
+            """)
+
+fig_resid = go.Figure()
+fig_resid.add_trace(go.Histogram(
+    x=_f_residuals,
+    nbinsx=40,
+    marker_color="#0E0E0E",
+    opacity=0.85,
+    name='Residuals',
+    showlegend=False,
+))
+_resid_y_max = 450
+fig_resid.add_trace(go.Scatter(
+    x=[_f_mean_residual, _f_mean_residual], y=[0, _resid_y_max],
+    mode='lines', line=dict(color=COL["negative"] if _f_mean_residual > 0 else COL["positive"], width=3, dash="dot"),
+    name=f'Mean = {_f_mean_residual:+.3f}', showlegend=True,
+))
+fig_resid.update_layout(xaxis_title="Residual", yaxis_title="Count", title=" ")
+style_plot(fig_resid, height=380)
+col_chart, _ = st.columns([4, 3])
+with col_chart:
+    st.plotly_chart(fig_resid, use_container_width=True)
+st.caption(
+    f"**Figure 10.** Histogram of the prediction residual for the forecasting Neural Network model on the test set."
+)
+
+st.space("small")
+
+# ---- 5b. Worst-predictions----
+st.markdown("""
+            #### Highest prediction errors
+
+            Table 8 below lists 10 route-month combinations where the forecasting Neural Network model made the largest absolute errors (expressed in percentage point, pp) on the test dataset.  
+            Such sampling reveals the cases where the model's assumptions break down, such as sudden operational changes or even potentially inconsistent reporting.
+
+            For example, the top 2 entries with 100% delay rate occured when QantasLink only have 1 reported flight each month for the Adelaide to Brisbane route (according to BITRE report).  
+            This was either an operational anomaly or a reporting error, since QantasLink operated 45 flights for the same route in March 2019, just 2 months prior.
+
+            Another example may be examined from the repeated delay rate underprediction in November 2025.  
+            These were caused by the unexpectedly high delay rate due to a combination of [air traffic communication outage](https://australianaviation.com.au/2025/11/airservices-resolves-comms-outage-that-delayed-flights) and [grounded A320 airplanes](https://www.smh.com.au/national/global-software-outage-triggers-australian-flight-delays-20251129-p5njew.html). 
+            """)
+
+worst_rows = [
+    {
+        'Year-Month': row['year_month'],
+        'Route': row['route'],
+        'Airline': row['airline'],
+        'Actual (%)': f"{row['actual'] * 100:.1f}",
+        'Predicted (%)': f"{row['predicted'] * 100:.1f}",
+        'Absolute error (pp)': f"{row['abs_error'] * 100:.1f}",
+    }
+    for _, row in ferr_df.nlargest(10, 'abs_error').iterrows()
+]
+st.caption("**Table 8.** Top 10 highest absolute prediction errors made by the forecasting Neural Network model on test set).")
+render_swiss_table(worst_rows, ['Year-Month', 'Route', 'Airline', 'Actual (%)', 'Predicted (%)', 'Absolute error (pp)'])
 
 

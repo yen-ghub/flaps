@@ -8,6 +8,8 @@ import os
 from html import escape
 
 import joblib
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import streamlit as st
 from src.ui_theme import apply_theme
 
@@ -118,7 +120,7 @@ apply_theme(
 )
 st.title("Model Details")
 st.markdown("""
-            The top 3 machine learning models for the nowcasting and forecasting approaches, when considering both the performance metrics and interpretability, are discussed in further detail below.
+            This page summarises the training data split and the architectures behind the best-performing prediction models.
             """)
 
 COL = {
@@ -227,8 +229,91 @@ except FileNotFoundError as e:
     st.error(f"Could not find metadata: {e}")
     st.stop()
 
+# ---- 1. Training Data Split ----
+st.markdown("## 1. Training Data Split")
+
+_split = now_metadata.get("split", {})
+st.markdown(
+    """
+    All of the models were trained and evaluated on the same train-validation-test split, where the distribution is shown in Figure 1 below.  
+    The dataset spans 2010–2025 (excluding the COVID period from 2020 to 2022), partitioned by year as follows:
+    - **Train** set: years 2010-2017 & 2023 (6135 samples)
+    - **Validation** set: years 2018 & 2024 (1575 samples)
+    - **Test** set: years 2019 & 2025 (1565 samples)
+    """
+)
+
+# Horizontal stacked bar chart of the train/val/test split
+_years = list(range(2010, 2026))
+# ColorBrewer Set2 (qualitative, 4 classes)
+_colors = {
+    "Train":      "#66c2a5",
+    "Validation": "#fc8d62",
+    "Test":       "#8da0cb",
+    "COVID":      "#e5e5e5",
+}
+_split_map = {
+    2010: "Train", 2011: "Train", 2012: "Train", 2013: "Train",
+    2014: "Train", 2015: "Train", 2016: "Train", 2017: "Train",
+    2018: "Validation",
+    2019: "Test",
+    2020: "COVID", 2021: "COVID", 2022: "COVID",
+    2023: "Train",
+    2024: "Validation",
+    2025: "Test",
+}
+
+fig, ax = plt.subplots(figsize=(9, 1.2))
+fig.patch.set_facecolor("none")
+ax.set_facecolor("none")
+plt.rcParams["font.family"] = "sans-serif"
+
+x = 0
+for year in _years:
+    label = _split_map[year]
+    color = _colors[label]
+    ax.barh(0, 1, left=x, color=color, edgecolor="white", linewidth=1.0, height=0.55)
+    ax.text(x + 0.5, 0, str(year), ha="center", va="center",
+            fontsize=8, color="#0C0C0C", fontfamily="sans-serif")
+    x += 1
+
+ax.set_xlim(0, len(_years))
+ax.set_ylim(-0.5, 0.5)
+ax.axis("off")
+
+legend_handles = [
+    mpatches.Patch(color=_colors["Train"],      label="Train"),
+    mpatches.Patch(color=_colors["Validation"], label="Validation"),
+    mpatches.Patch(color=_colors["Test"],       label="Test"),
+    mpatches.Patch(color=_colors["COVID"],      label="COVID (excluded)"),
+]
+fig.legend(handles=legend_handles, loc="lower center", ncol=4,
+           frameon=False, fontsize=8, prop={"family": "sans"})
+
+fig.subplots_adjust(bottom=0.35)
+_col, _ = st.columns([0.4, 0.4])
+with _col:
+    st.pyplot(fig, use_container_width=True)
+    st.caption("**Figure 1.** The distribution of the training data across the Train, Validation and Test sets.")
+plt.close(fig)
+
+st.markdown(
+     """
+    There were two considerations when performing the training data split:
+    - Temporal split: the sets were partitioned into contiguous year blocks (train: earlier years, val & test: later years) rather than randomly sampling individual months, in order to avoid temporal leakage. This is a common practice to keep validation and testing fair, by having the model only trained on data from the years *before* the validation and testing years (i.e. the trained model does not receive information for the "future").
+    - Pre- and post-Covid stratification: each set contains data from the years before and after COVID, so the model is not evaluated solely on one operating regime.
+    """
+)
+
+
+st.divider()
+st.markdown("## 2. Best performing machine learning models")
+st.markdown("""
+            The top 3 machine learning models for the nowcasting and forecasting approaches, when considering both the performance metrics and interpretability, are discussed in further detail below.
+            """)
+
 # ---- 1. Ridge Regression ----
-st.markdown("### 1. For Regression Nowcasting: Ridge")
+st.markdown("### 2.1 For Regression Nowcasting: Ridge")
 st.markdown("This is the best regression model (i.e. in predicting the percentage of delayed flights) under the nowcasting approach.  \n"
             "One of the aims of the nowcasting approach is to ascertain the dominant features, which requires the model to be easily interpretable.  \n"
             "Thus, while its accuracy (_R²_ = 0.5172) is slightly lower than the more complex models like Neural Network (_R²_ = 0.5427), this trade-off is justifiable due to its high interpretability.")
@@ -389,7 +474,7 @@ st.markdown("It is observed that:  \n"
 
 # ---- 2. XGBoost Classification ----
 st.divider()
-st.markdown("### 2. For Classification Nowcasting and Forecasting: XGBoost")
+st.markdown("### 2.2 For Classification Nowcasting and Forecasting: XGBoost")
 st.markdown("This is the best classification model (i.e. in predicting if it is a high delay rate month) under both the nowcasting and forecasting approaches.  \n"
             "Its accuracy (_F1_ = 0.7525 for nowcasting, _F1_ = 0.7415 for forecasting) is slightly lower than the Neural Network model (_F1_ = 0.7618 for nowcasting, _F1_ = 0.7620 for forecasting).  \n"
             "However, after inspecting the accuracy breakdown, XGBoost exhibits the best balance between _precision_ (a measure of how well the model avoids false positives) and _recall_ (how well the model avoids false negatives)."
@@ -439,7 +524,7 @@ except Exception as exc:
 
 # ---- 3. Neural Network Models ----
 st.divider()
-st.subheader("3. For Regression Forecasting: Neural Network Models")
+st.subheader("2.3 For Regression Forecasting: Neural Network Models")
 st.markdown("This is the best regression model under the forecasting approach, because it has the highest accuracy (_R²_ = 0.5096) vs the other two models (_R²_ = 0.4931 and 0.5052).  \n"
     "Unlike the nowcasting approach (where interpretability is important), the accuracy of prediction is the main priority when forecasting for the upcoming month.")
 st.markdown("The neural network architecture used to predict the delay rate under the nowcasting and forecasting approaches (identical in both) are presented in Table 3 as a list of the employed neural network layers."
