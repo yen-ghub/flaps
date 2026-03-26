@@ -34,8 +34,7 @@ TRAINING_CSV = os.path.join(PROJECT_ROOT, 'data', 'processed', 'ml_training_data
 def test_compute_lag_features_correct_values():
     """Lag values equal the previous row's delay_rate within each airline-route group."""
     # Two airline-routes, each with 3 months of data in chronological order.
-    # After lagging, the first row of each group should have no prior value (NaN),
-    # and subsequent rows should pick up the previous month's delay rate.
+    # After lagging, the first row of each group should have no prior value (NaN), and subsequent rows should pick up the previous month's delay rate.
     df = pd.DataFrame({
         'airline_route': ['A_X_Y', 'A_X_Y', 'A_X_Y', 'B_X_Y', 'B_X_Y', 'B_X_Y'],
         'delay_rate':    [0.10,    0.20,    0.30,    0.40,    0.50,    0.60],
@@ -55,10 +54,8 @@ def test_compute_lag_features_correct_values():
 
 def test_compute_lag_features_no_bleed_across_groups():
     """lag1 of the first row of group B must not use the last row of group A."""
-    # This is the key correctness property of a grouped shift — the lag should
-    # never carry over from one airline-route into another. If groupby is applied
-    # correctly, the first row of group B is always NaN regardless of what group A
-    # looks like.
+    # This is the key correctness property of a grouped shift, the lag should never carry over from one airline-route into another.
+    # If groupby is applied correctly, the first row of group B is always NaN regardless of what group A looks like.
     df = pd.DataFrame({
         'airline_route': ['A_X_Y', 'A_X_Y', 'B_X_Y', 'B_X_Y'],
         'delay_rate':    [0.10,    0.20,    0.30,    0.40],
