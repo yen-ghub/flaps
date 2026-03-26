@@ -211,9 +211,12 @@ __marimo__/
 
 # Ignore folder contents
 .vscode
+#.streamlit/
 data/raw/*/*.csv
+data/processed/old/*
 app/unused (Gitignored)/*
 writingstyle/*
+app/*.txt
 
 # Keep folder structure
 !data/raw/.gitkeep
