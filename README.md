@@ -44,7 +44,7 @@ Thus, the following two-part approach is developed:
 1. **Nowcasting approach** 
     - The purpose of this approach is to aid with model selection and identification of dominant features.  
     - No forecast will be made for the current month.
-    - This approach uses real-time data (i.e. [explain general meaning or description of technique briefly]) and is only applied to previous months where data is available.
+    - This approach uses real-time data (i.e. For example: each model uses data up until January 2026 to provide insight on January 2026's delays itself.) and thus is only applied to previous months where data is available.
     - Accordingly, each of the 7 machine learning models will utilise data up until the previous month to provide insight on the previous month's flight delays.
     - For example: each model uses data up until January 2026 to _provide insight on_ January 2026's delays itself.
 2. **Forecasting approach**
@@ -63,7 +63,7 @@ This was confirmed by comparing their delay rates for January 2026, where the re
 #### Best Overall Models
 
 Depending on the approach (nowcasting or forecasting) and the type of prediction (regression or classification), there are three best overall models identified.  
-Each of these models are briefly described below and discussed in further detail on the [Model Details](https://flaps.online/Model_Details) page of the web app:
+Each of these models are briefly described below:
 - For **regression nowcasting**: Ridge.
     It is a simple linear model, but the performance is still comparable to the more complex non-linear models. Although there is a small sacrifice in accuracy, it is worth the trade-off in higher interpretability; which is a priority in the nowcasting approach. The highest-accuracy route is Sydney→Melbourne (R² = 0.703).
 - For both **classification nowcasting** and **forecasting**: XGBoost.
@@ -79,6 +79,7 @@ Each of these models are briefly described below and discussed in further detail
     It gives the best accuracy out of all the regression models under the forecasting approach. The highest-accuracy route is Adelaide→Perth (R² = 0.652).
     The model is more complex and less interpretable, but this trade-off is acceptable because the priority of the forecasting approach is the prediction accuracy.
 
+These models are discussed in further detail on the [Model Details](https://flaps.online/Model_Details) page and evaluated on the [Model Evaluation](https://flaps.online/Model_Evaluation) page.
 
 ## Tech Stack
 
@@ -106,7 +107,7 @@ Visit **[flaps.online](https://flaps.online)** and navigate through the sidebar:
 | **Nowcasting** | Run nowcast prediction of past month's flight delay, to assess model performance and identify the dominant predictive features |
 | **Forecasting** | Run forecast prediction of this month's flight delay, available from the first day of the month |
 | **Model Details** | Architecture, diagrams, and feature importance for the top 3 performing ML models |
-| **Model Performance** | Metrics, baseline comparisons, time-series plots, and confusion matrices |
+| **Model Evaluation** | Metrics, baseline comparisons, actual vs prediction, error analysis |
 | **Update and Re-train** | Download the latest data and retrain models live |
 
 
