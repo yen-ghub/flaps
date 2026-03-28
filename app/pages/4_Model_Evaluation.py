@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import streamlit as st
 
 from src.data_loader import NOWCASTING_MODELS_DIR, FORECASTING_MODELS_DIR, load_metadata, load_forecasting_metadata
@@ -67,7 +66,7 @@ apply_theme(
 )
 st.title("Model Evaluation")
 st.markdown(
-    "In order to assess the quality of the models, a number of evaluation metrics are computed and presented below."
+    "To assess the quality of the models, several evaluation metrics are computed and presented below."
 )
 
 COL = {
@@ -208,13 +207,13 @@ st.divider()
 st.subheader("1. Single-Number Evaluation Metrics")
 
 st.markdown("""
-            A single-number evaluation metric is a quantitative measure that summarises a model's performance in a single number, typically covering one specific aspect of the performance.  
+            A single-number evaluation metric is a quantitative measure that summarises a model's performance in a single number, typically covering one specific aspect of performance.  
             Tables 4 to 7 summarise the single-number evaluation metrics computed for all the models considered in this project:
 
             - **R²**: measures how well the model explains variation in delay rates, where a score of 1.0 means perfect prediction for all data points and 0.0 means no better than guessing the average.  
                 For the models presented here, most of the R² values are just above 0.5, which means the models explain slightly more than half of the month-to-month variation in delay rate.
             - **MAE** (Mean Absolute Error) and **RMSE** (Root-Mean-Square Error): both measure prediction accuracy in percentage points.  
-                MAE (about 6% for all models) is the average error size, while RMSE (about 8% for all models) penalizes larger errors more due to the squaring operation.  
+                MAE (about 6% for all models) is the average error size, while RMSE (about 8% for all models) penalises larger errors more due to the squaring operation.  
                 Here, RMSE is only about 35% higher than MAE, which indicates the majority of the errors are small.  
             - **Precision**: of all the _predicted_ high-delay months, how often is it correct?
             - **Recall**: of all the _actual_ high-delay months, how many does the model correctly identify?
@@ -382,7 +381,7 @@ st.divider()
 st.subheader("3. Actual vs Prediction")
 
 st.markdown("""
-            This section visualises how closely the model predictions match the actual delay rates, using time-series for the regression models and confusion matrix for the classification models.  
+            This section visualises how closely the model predictions match the actual delay rates, using time series for the regression models and confusion matrices for the classification models.
             """)
 st.markdown("""
               
@@ -485,8 +484,8 @@ else:
 
 st.space("medium")
 
-def build_confusion_figure(p):
-    """Build a confusion matrix subplot figure from a predictions dict."""
+def build_confusion_figures(p):
+    """Build one confusion matrix figure per classifier. Returns list of (name, fig) tuples."""
     clf_list = []
     if 'xgb_pred' in p:
         clf_list.append(('XGBoost', np.array(p['xgb_pred'])))
@@ -495,17 +494,12 @@ def build_confusion_figure(p):
     if 'nn_clf_pred' in p:
         clf_list.append(('Neural Network', np.array(p['nn_clf_pred'])))
     if not clf_list:
-        return None
+        return []
     y_true_clf = np.array(p['y_true_clf'])
-    n_clf = len(clf_list)
-    fig = make_subplots(
-        rows=1, cols=n_clf,
-        subplot_titles=[name for name, _ in clf_list],
-        horizontal_spacing=0.12,
-    )
     labels = ['Normal', 'High Delay']
     cm_labels = [['True Negative', 'False Positive'], ['False Negative', 'True Positive']]
-    for i, (_, y_pred_clf) in enumerate(clf_list):
+    result = []
+    for i, (name, y_pred_clf) in enumerate(clf_list):
         tp = np.sum((y_true_clf == 1) & (y_pred_clf == 1))
         tn = np.sum((y_true_clf == 0) & (y_pred_clf == 0))
         fp = np.sum((y_true_clf == 0) & (y_pred_clf == 1))
@@ -515,6 +509,7 @@ def build_confusion_figure(p):
             cell_text = [[f"{cm_labels[r][c]}<br>{cm[r][c]}" for c in range(2)] for r in range(2)]
         else:
             cell_text = [[str(cm[r][c]) for c in range(2)] for r in range(2)]
+        fig = go.Figure()
         fig.add_trace(go.Heatmap(
             z=cm, x=labels, y=labels,
             text=cell_text,
@@ -522,39 +517,44 @@ def build_confusion_figure(p):
             textfont={'size': 13},
             colorscale=[[0.0, "#f8f7f3"], [1.0, "#1f4e79"]],
             showscale=False,
-        ), row=1, col=i+1)
-        fig.update_xaxes(title_text='Predicted', row=1, col=i+1)
-        fig.update_yaxes(title_text='Actual', row=1, col=i+1)
-    fig.update_layout(title="")
-    style_plot(fig, height=350)
-    fig.update_xaxes(showgrid=False)
-    fig.update_yaxes(showgrid=False)
-    return fig
+        ))
+        fig.update_xaxes(title_text='Predicted', showgrid=False)
+        fig.update_yaxes(title_text='Actual', showgrid=False)
+        fig.update_layout(title=name)
+        style_plot(fig, height=350)
+        result.append((name, fig))
+    return result
 
-fig_cm_now = build_confusion_figure(preds)
-fig_cm_fore = build_confusion_figure(fpreds)
+fig_cm_now = build_confusion_figures(preds)
+fig_cm_fore = build_confusion_figures(fpreds)
 
 st.markdown("""
             ##### Confusion matrix
 
             For the **classification** models, a confusion matrix summarises a model's performance by comparing its predicted classes against the actual classes.  
             Figures 7 and 8 show the confusion matrices of the classification models employed to predict high-delay months, under the nowcasting and forecasting approaches, respectively.  
-            Logistic regression model is not included here since it displays similar behaviour to Random Forest, but with worse performance.
+            The logistic regression model is not included here as it displays similar behaviour to Random Forest, but with worse performance.
 
-            The results here echo the observations made from the single-value evaluation metrics above:
+            The results here echo the observations made from the single-number evaluation metrics above:
             - XGBoost has the best balance in minimising False Positives and False Negatives.
             - Random Forest has a stronger tendency to predict False Negative, i.e. predicting a normal month when it is actually a high-delay month (low recall).
             - Neural Network has a stronger tendency to predict False Positive, i.e. predicting a high-delay month when it is actually a normal month (low precision).
             """)
 
-if fig_cm_now is not None:
-    st.plotly_chart(fig_cm_now, use_container_width=True)
+if fig_cm_now:
+    cols = st.columns(len(fig_cm_now))
+    for col, (_, fig) in zip(cols, fig_cm_now):
+        with col:
+            st.plotly_chart(fig, use_container_width=True)
     st.caption("**Figure 7.** Confusion matrices for the classification models under the **nowcasting** approach.")
 
 st.space("small")
 
-if fig_cm_fore is not None:
-    st.plotly_chart(fig_cm_fore, use_container_width=True)
+if fig_cm_fore:
+    cols = st.columns(len(fig_cm_fore))
+    for col, (_, fig) in zip(cols, fig_cm_fore):
+        with col:
+            st.plotly_chart(fig, use_container_width=True)
     st.caption("**Figure 8.** Confusion matrices for the classification models under the **forecasting** approach.")
 
 
@@ -567,8 +567,8 @@ st.markdown("""
             The prediction accuracy of the models varies depending on the route.
 
             There are two factors affecting the route-specific accuracy:
-            - inherent volatility: some routes exhibit greater delay rate volatility throughout the historical record, reducing the predictability of the underlying signal;
-            - flight volume: routes with fewer than 50 flights per month exhibit high delay rate volatility, where a single delayed flight can shift the monthly rate by several percentage points.  
+            - **Inherent volatility:** some routes exhibit greater delay rate volatility throughout the historical record, which reduces the predictability of the underlying signal.
+            - **Flight volume:** routes with fewer than 50 flights per month exhibit high delay rate volatility, where a single delayed flight can shift the monthly rate by several percentage points.
             
             Figure 9 compares the R² values of the predictions made for each route under the nowcasting (Ridge) and the forecasting (Neural Network) approaches.  
             
@@ -616,12 +616,16 @@ fig_route.update_layout(
     bargroupgap=0.08,
     title="",
     xaxis_title="R²",
-    xaxis=dict(range=[min(route_df['Ridge R²'].min(), froute_df['Ridge R²'].min()) - 0.05, 0.85]),
+    xaxis=dict(range=[min(route_df['Ridge R²'].min(), froute_df['Ridge R²'].min()) - 0.05, 0.8]),
+    legend=dict(
+        orientation="h",
+        xanchor="left", x=0,
+        yanchor="bottom", y=1.02,
+    ),
 )
-style_plot(fig_route, height=max(420, len(route_df) * 40))
-col_chart, _ = st.columns([3, 1])
-with col_chart:
-    st.plotly_chart(fig_route, use_container_width=True)
+style_plot(fig_route, height=max(420, len(route_df) * 55))
+fig_route.update_layout(width=700)
+st.plotly_chart(fig_route, use_container_width=False)
 st.caption("**Figure 9.** Comparison of delay rate prediction accuracy (R²) by route, comparing nowcasting (Ridge) and forecasting (Neural Network) approaches.")
 
 st.divider()
@@ -632,7 +636,7 @@ st.subheader("5. Error Analysis")
 
 st.markdown("""
             This section investigates the residuals (prediction errors) of the forecasting Neural Network model on the test dataset: examining the residual histogram distribution and the worst-predicted routes.  
-            Residuals are defined as (_predicted delay rate_ − _actual delay rate_), such that a posive residual value indicates that the model is overpredicting the delay rate and vice versa.
+            Residuals are defined as (_predicted delay rate_ − _actual delay rate_), such that a positive residual value indicates that the model is overpredicting the delay rate and vice versa.
             """)
 
 # Build error DataFrame from forecasting test predictions
@@ -675,7 +679,7 @@ st.markdown("""
             #### Residual histogram
 
             Figure 10 shows the histogram of the residual, where the distribution is roughly symmetric around zero, with no pronounced tail in either direction.  
-            This indicates that the prediction model is well-calibrated, as a non-zero mean indicates a systematic bias is present.
+            This indicates that the prediction model is well-calibrated; a non-zero mean would indicate a systematic bias is present.
             """)
 
 fig_resid = go.Figure()
@@ -693,11 +697,17 @@ fig_resid.add_trace(go.Scatter(
     mode='lines', line=dict(color=COL["negative"] if _f_mean_residual > 0 else COL["positive"], width=3, dash="dot"),
     name=f'Mean = {_f_mean_residual:+.3f}', showlegend=True,
 ))
-fig_resid.update_layout(xaxis_title="Residual", yaxis_title="Count", title=" ")
+fig_resid.update_layout(
+    xaxis_title="Residual", yaxis_title="Count", title=" ",
+    legend=dict(
+        orientation="h",
+        xanchor="left", x=0,
+        yanchor="bottom", y=1.02,
+    ),
+)
 style_plot(fig_resid, height=380)
-col_chart, _ = st.columns([4, 3])
-with col_chart:
-    st.plotly_chart(fig_resid, use_container_width=True)
+fig_resid.update_layout(width=600)
+st.plotly_chart(fig_resid, use_container_width=False)
 st.caption(
     f"**Figure 10.** Histogram of the prediction residual for the forecasting Neural Network model on the test set."
 )
@@ -708,13 +718,13 @@ st.space("small")
 st.markdown("""
             #### Highest prediction errors
 
-            Table 8 below lists 10 route-month combinations where the forecasting Neural Network model made the largest absolute errors (expressed in percentage point, pp) on the test dataset.  
-            Such sampling reveals the cases where the model's assumptions break down, such as sudden operational changes or even potentially inconsistent reporting.
+            Table 8 below lists 10 route-month combinations where the forecasting Neural Network model made the largest absolute errors (expressed in percentage points (pp)) on the test dataset.  
+            This listing reveals cases where the model's assumptions break down, such as sudden operational changes or even potentially inconsistent reporting.
 
-            For example, the top 2 entries with 100% delay rate occured when QantasLink only have 1 reported flight each month for the Adelaide to Brisbane route (according to BITRE report).  
+            For example, the top 2 entries with 100% delay rate occurred when QantasLink only had 1 reported flight each month for the Adelaide to Brisbane route (according to the BITRE report).  
             This was either an operational anomaly or a reporting error, since QantasLink operated 45 flights for the same route in March 2019, just 2 months prior.
 
-            Another example may be examined from the repeated delay rate underprediction in November 2025.  
+            Another example can be seen in the repeated delay rate underprediction for November 2025.  
             These were caused by the unexpectedly high delay rate due to a combination of [air traffic communication outage](https://australianaviation.com.au/2025/11/airservices-resolves-comms-outage-that-delayed-flights) and [grounded A320 airplanes](https://www.smh.com.au/national/global-software-outage-triggers-australian-flight-delays-20251129-p5njew.html). 
             """)
 
@@ -729,7 +739,7 @@ worst_rows = [
     }
     for _, row in ferr_df.nlargest(10, 'abs_error').iterrows()
 ]
-st.caption("**Table 8.** Top 10 highest absolute prediction errors made by the forecasting Neural Network model on test set).")
+st.caption("**Table 8.** Top 10 highest absolute prediction errors made by the forecasting Neural Network model on the test set.")
 render_swiss_table(worst_rows, ['Year-Month', 'Route', 'Airline', 'Actual (%)', 'Predicted (%)', 'Absolute error (pp)'])
 
 
