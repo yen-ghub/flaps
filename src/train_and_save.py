@@ -44,8 +44,78 @@ try:
 except ImportError:
     HAS_TF = False
 
+try:
+    import shap
+    HAS_SHAP = True
+except ImportError:
+    HAS_SHAP = False
+
 from src.data_loader import FORECASTING_MODELS_DIR, NOWCASTING_MODELS_DIR, load_training_data, load_load_factor_data
 from src.feature_engineering import build_feature_matrix, build_forecasting_feature_matrix, split_data
+
+
+def _compute_shap_values(xgb_clf, nn_reg, X_test, X_train_scaled, X_test_scaled, feature_names):
+    """Compute mean |SHAP| per feature for XGBoost and NN regressor.
+
+    Returns dict with keys 'shap_xgb_clf' and/or 'shap_nn_reg',
+    each mapping feature names to mean absolute SHAP values.
+    """
+    result = {}
+    if not HAS_SHAP:
+        return result
+
+    # XGBoost: TreeExplainer (fast, exact)
+    if xgb_clf is not None:
+        try:
+            print("  Computing SHAP values for XGBoost...")
+            explainer = shap.TreeExplainer(xgb_clf)
+            sv = explainer.shap_values(X_test)
+            mean_abs = np.abs(sv).mean(axis=0)
+            result['shap_xgb_clf'] = {
+                name: float(val.item()) if hasattr(val, 'item') else float(val)
+                for name, val in zip(feature_names, mean_abs)
+            }
+            print("    Done.")
+        except Exception as exc:
+            print(f"    XGBoost SHAP failed: {exc}")
+
+    # NN Regressor: GradientExplainer, fallback to KernelExplainer
+    if nn_reg is not None:
+        bg_idx = np.random.choice(X_train_scaled.shape[0], min(200, X_train_scaled.shape[0]), replace=False)
+        background = X_train_scaled[bg_idx]
+
+        try:
+            print("  Computing SHAP values for NN (GradientExplainer)...")
+            explainer = shap.GradientExplainer(nn_reg, background)
+            sv = explainer.shap_values(X_test_scaled)
+            if isinstance(sv, list):
+                sv = sv[0]
+            mean_abs = np.abs(sv).mean(axis=0)
+            result['shap_nn_reg'] = {
+                name: float(val.item()) if hasattr(val, 'item') else float(val)
+                for name, val in zip(feature_names, mean_abs)
+            }
+            print("    Done.")
+        except Exception as exc:
+            print(f"    GradientExplainer failed ({exc}), falling back to KernelExplainer...")
+            try:
+                subset_idx = np.random.choice(X_test_scaled.shape[0], min(100, X_test_scaled.shape[0]), replace=False)
+                X_subset = X_test_scaled[subset_idx]
+                explainer = shap.KernelExplainer(nn_reg.predict, background)
+                sv = explainer.shap_values(X_subset)
+                if isinstance(sv, list):
+                    sv = sv[0]
+                mean_abs = np.abs(sv).mean(axis=0)
+                result['shap_nn_reg'] = {
+                    name: float(val.item()) if hasattr(val, 'item') else float(val)
+                for name, val in zip(feature_names, mean_abs)
+                }
+                print("    Done (KernelExplainer fallback).")
+            except Exception as exc2:
+                print(f"    KernelExplainer also failed: {exc2}")
+
+    return result
+
 
 ## Nowcasting models ##
 def train_and_save():
@@ -380,6 +450,12 @@ def train_and_save():
     with open(os.path.join(NOWCASTING_MODELS_DIR, 'full_predictions.json'), 'w') as f:
         json.dump(full_predictions, f)
 
+    # Compute SHAP values
+    print("\nComputing SHAP feature importance...")
+    shap_results = _compute_shap_values(
+        xgb_clf, nn_reg, X_test, X_train_scaled, X_test_scaled, feature_names
+    )
+
     # Save metadata
     metadata = {
         'feature_names': feature_names,
@@ -404,6 +480,7 @@ def train_and_save():
         'valid_routes': sorted(df_processed['route'].unique().tolist()),
         'valid_airline_routes': sorted(df_processed['airline_route'].unique().tolist()),
     }
+    metadata.update(shap_results)
 
     with open(os.path.join(NOWCASTING_MODELS_DIR, 'metadata.json'), 'w') as f:
         json.dump(metadata, f, indent=2)
@@ -748,6 +825,12 @@ def train_and_save_forecasting():
     with open(os.path.join(save_dir, 'full_predictions.json'), 'w') as f:
         json.dump(full_predictions, f)
 
+    # Compute SHAP values
+    print("\nComputing SHAP feature importance...")
+    shap_results = _compute_shap_values(
+        xgb_clf, nn_reg, X_test, X_train_scaled, X_test_scaled, feature_names
+    )
+
     # Save metadata
     metadata = {
         'feature_names': feature_names,
@@ -773,6 +856,7 @@ def train_and_save_forecasting():
         'valid_routes': sorted(df_processed['route'].unique().tolist()),
         'valid_airline_routes': sorted(df_processed['airline_route'].unique().tolist()),
     }
+    metadata.update(shap_results)
 
     with open(os.path.join(save_dir, 'metadata.json'), 'w') as f:
         json.dump(metadata, f, indent=2)

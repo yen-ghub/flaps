@@ -106,16 +106,19 @@ apply_theme(
         border-bottom: none;
     }
     .swiss-table th:nth-child(1), .swiss-table td:nth-child(1) { width: 52px; }
-    .swiss-table th:nth-child(2), .swiss-table td:nth-child(2) { width: 220px; }
-    .swiss-table th:nth-child(3), .swiss-table td:nth-child(3) { width: 480px; white-space: normal; }
+    .swiss-table th:nth-child(2), .swiss-table td:nth-child(2) { width: 160px; }
+    .swiss-table th:nth-child(3), .swiss-table td:nth-child(3) { width: 400px; white-space: normal; }
     .swiss-table th:last-child {
         text-align: center;
-        width: 420px;
+        width: 200px;
     }
-    .swiss-table td:last-child { width: 420px; }
+    .swiss-table td:last-child { width: 220px; }
     /* Tight 2-column table (Parameter/Value) */
     .swiss-table-tight th:nth-child(1), .swiss-table-tight td:nth-child(1) { width: 140px; }
     .swiss-table-tight th:nth-child(2), .swiss-table-tight td:nth-child(2) { width: 120px; }
+    /* NN layer table (Table 4) — override Units and Params column widths */
+    .swiss-table-nn th:nth-child(3), .swiss-table-nn td:nth-child(3) { width: 80px; }
+    .swiss-table-nn th:nth-child(6), .swiss-table-nn td:nth-child(6) { width: 80px; }
     """
 )
 st.title("Model Details")
@@ -334,25 +337,49 @@ st.space('small')
 _FEATURE_DESCRIPTIONS = {
     "delay_rate_lag1":           "Delay rate 1 month ago",
     "delay_rate_lag12":          "Delay rate 12 months ago",
+    "delay_rate_gradient":       "Month-on-month change in delay rate (trend)",
+    "sectors_scheduled":         "Number of scheduled flights in the month",
     "rainy_days_arr_exp":        "Number of rainy days at arrival airport (exponential)",
     "temp_volatility_total_exp": "Temperature swing at departure and arrival airports (exponential)",
-    "delay_rate_gradient":       "Month-on-month change in delay rate (trend)",
-    "airline_Jetstar":           "Airline indicator: Jetstar",
-    "airline_Qantas":            "Airline indicator: Qantas",
+    "extreme_weather_days_total": "Total extreme weather days at departure and arrival airports",
     "n_public_holidays_total":   "Number of public holidays",
-    "route_Brisbane_Perth":      "Route indicator: Brisbane to Perth",
     "pct_school_holiday":        "Proportion of days that are school holidays",
-    "route_Melbourne_Brisbane":  "Route indicator: Melbourne to Brisbane",
-    "route_Sydney_Hobart":       "Route indicator: Sydney to Hobart",
-    "airline_Rex Airlines":      "Airline indicator: Rex Airlines",
     "month_cos":                 "Cosine encoding of calendar month",
     "month_sin":                 "Sine encoding of calendar month",
-    "route_Sydney_Brisbane":     "Route indicator: Sydney to Brisbane",
+    "airline_Jetstar":           "Airline indicator: Jetstar",
+    "airline_Qantas":            "Airline indicator: Qantas",
+    "airline_QantasLink":        "Airline indicator: QantasLink",
+    "airline_Regional Express":  "Airline indicator: Regional Express",
+    "airline_Rex Airlines":      "Airline indicator: Rex Airlines",
+    "airline_Tigerair Australia": "Airline indicator: Tigerair Australia",
+    "airline_Virgin Australia":  "Airline indicator: Virgin Australia",
+    "airline_Virgin Australia Regional Airlines": "Airline indicator: Virgin Australia Regional Airlines",
+    "route_Adelaide_Brisbane":   "Route indicator: Adelaide to Brisbane",
+    "route_Adelaide_Melbourne":  "Route indicator: Adelaide to Melbourne",
+    "route_Adelaide_Perth":      "Route indicator: Adelaide to Perth",
+    "route_Brisbane_Adelaide":   "Route indicator: Brisbane to Adelaide",
+    "route_Brisbane_Melbourne":  "Route indicator: Brisbane to Melbourne",
+    "route_Brisbane_Perth":      "Route indicator: Brisbane to Perth",
+    "route_Brisbane_Sydney":     "Route indicator: Brisbane to Sydney",
+    "route_Hobart_Melbourne":    "Route indicator: Hobart to Melbourne",
+    "route_Hobart_Sydney":       "Route indicator: Hobart to Sydney",
+    "route_Melbourne_Adelaide":  "Route indicator: Melbourne to Adelaide",
+    "route_Melbourne_Brisbane":  "Route indicator: Melbourne to Brisbane",
+    "route_Melbourne_Perth":     "Route indicator: Melbourne to Perth",
+    "route_Melbourne_Sydney":    "Route indicator: Melbourne to Sydney",
     "route_Perth_Adelaide":      "Route indicator: Perth to Adelaide",
+    "route_Perth_Melbourne":     "Route indicator: Perth to Melbourne",
+    "route_Perth_Sydney":        "Route indicator: Perth to Sydney",
+    "route_Sydney_Adelaide":     "Route indicator: Sydney to Adelaide",
+    "route_Sydney_Brisbane":     "Route indicator: Sydney to Brisbane",
+    "route_Sydney_Hobart":       "Route indicator: Sydney to Hobart",
+    "route_Sydney_Melbourne":    "Route indicator: Sydney to Melbourne",
+    "route_Sydney_Perth":        "Route indicator: Sydney to Perth",
 }
 
 # This is to draw the bar plot inside the table cells
-def _svg_bar(value, max_abs, bar_width=320, zero_pct=0.25):
+# See "CSS .swiss-table td:last-child" to adjust svg bar column width
+def _svg_bar(value, max_abs, bar_width=260, zero_pct=0.2):
     """Return an SVG bar + numeric label for a coefficient cell.
     zero_pct controls where the zero-line sits (0.25 = 25% from left).
     """
@@ -375,6 +402,23 @@ def _svg_bar(value, max_abs, bar_width=320, zero_pct=0.25):
         f'<span style="font-size:0.8rem;font-variant-numeric:tabular-nums;color:#0d0d0d;">{label}</span>'
         f'</div>'
     )
+
+def _svg_bar_positive(value, max_val, bar_width=120):
+    """Return an SVG bar + numeric label for a positive-only importance cell."""
+    if max_val > 0:
+        fill_px = int(value / max_val * bar_width)
+    else:
+        fill_px = 0
+    label = f"{value:.4f}"
+    return (
+        f'<div style="display:flex;align-items:center;gap:6px;white-space:nowrap;">'
+        f'<svg width="{bar_width}" height="14" style="flex-shrink:0;">'
+        f'<rect x="0" y="2" width="{fill_px}" height="10" fill="{COL["positive"]}" rx="1"/>'
+        f'</svg>'
+        f'<span style="font-size:0.8rem;font-variant-numeric:tabular-nums;color:#0d0d0d;">{label}</span>'
+        f'</div>'
+    )
+
 
 # This is to extract the coefficients from the saved model parameters
 def _ridge_coef_section(models_dir, metadata, max_abs=None):
@@ -484,6 +528,40 @@ st.markdown("For example, the precision and recall for the XGBoost model are bot
             )
 st.markdown("")
 
+# To generate a table of SHAP values for the top 10 features
+def _shap_importance_table(shap_dict, top_n=10):
+    """Render a SHAP mean |value| importance table in the Swiss HTML style."""
+    if not shap_dict:
+        return
+    sorted_items = sorted(shap_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:top_n]
+    max_val = sorted_items[0][1] if sorted_items else 1.0
+
+    columns = ["Rank", "Feature", "Description", "Mean |SHAP value|"]
+    header_html = "".join(f"<th>{escape(col)}</th>" for col in columns)
+    body_rows = []
+    for rank, (feat, val) in enumerate(sorted_items, 1):
+        desc = _FEATURE_DESCRIPTIONS.get(feat, "—")
+        bar_html = _svg_bar_positive(val, max_val)
+        cells = (
+            f"<td>{rank}</td>"
+            f"<td>{escape(feat)}</td>"
+            f"<td>{escape(desc)}</td>"
+            f"<td style='text-align:center;padding:0.46rem 0.62rem;'>{bar_html}</td>"
+        )
+        body_rows.append(f"<tr>{cells}</tr>")
+    body_html = "".join(body_rows)
+    st.markdown(
+        f"""
+        <div class="swiss-table-wrap">
+            <table class="swiss-table">
+                <thead><tr>{header_html}</tr></thead>
+                <tbody>{body_html}</tbody>
+            </table>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 try:
     xgb_path = os.path.join(NOWCASTING_MODELS_DIR, "xgb_classifier.pkl")
     xgb_model = load_joblib_model(xgb_path)
@@ -513,6 +591,26 @@ try:
         columns=["Hyperparameter", "Value"],
         table_class="swiss-table swiss-table-tight",
     )
+
+    if 'shap_xgb_clf' in now_metadata or 'shap_xgb_clf' in fore_metadata:
+        st.space('small')
+        st.markdown("""
+                    Unlike Ridge regression, the XGBoost model does not have a single weight value for each feature.  
+                    Thus, the SHAP (SHapley Additive exPlanations) method was used to decompose each prediction into a baseline value plus the contribution values made by each input feature.  
+                    These contribution values of each feature are referred to as the SHAP values.  
+                    Tables 3a and 3b below show the absolute SHAP value averaged across all test set predictions (which indicate the impact of each feature on the classification decision), for the nowcasting and forecasting XGBoost models, respectively.
+                    """
+                    )
+        col_now, col_fore = st.columns(2)
+        with col_now:
+            if 'shap_xgb_clf' in now_metadata:
+                st.caption("**Table 3a.** Top 10 features by absolute SHAP value for the nowcasting XGBoost classifier.")
+                _shap_importance_table(now_metadata['shap_xgb_clf'])
+        with col_fore:
+            if 'shap_xgb_clf' in fore_metadata:
+                st.caption("**Table 3b.** Top 10 features by absolute SHAP value for the forecasting XGBoost classifier .")
+                _shap_importance_table(fore_metadata['shap_xgb_clf'])
+
 except FileNotFoundError:
     st.warning(f"XGBoost model file not found: `{NOWCASTING_MODELS_DIR}/xgb_classifier.pkl`")
 except Exception as exc:
@@ -527,7 +625,7 @@ st.divider()
 st.markdown("### 2.3 For Regression Forecasting: Neural Network Models")
 st.markdown("This is the best regression model under the forecasting approach, because it has the highest accuracy (_R²_ = 0.5096) vs the other two models (_R²_ = 0.4931 and 0.5052).  \n"
     "Unlike the nowcasting approach (where interpretability is important), the accuracy of prediction is the main priority when forecasting for the upcoming month.")
-st.markdown("The neural network architecture used to predict the delay rate under the nowcasting and forecasting approaches (identical in both) is presented in Table 3 as a list of the employed neural network layers."
+st.markdown("The neural network architecture used to predict the delay rate under the nowcasting and forecasting approaches (identical in both) is presented in Table 4 as a list of the employed neural network layers."
             )
 try:
     nn_reg_path = os.path.join(NOWCASTING_MODELS_DIR, "nn_regressor.keras")
@@ -545,18 +643,21 @@ try:
 
         col1, col2 = st.columns(2)
         with col1:
-            st.caption("**Table 3.** The layers employed in the Neural Network model for both the nowcasting and forecasting approaches.")
+            st.caption("**Table 4.** The layers employed in the regression neural network model for both the nowcasting and forecasting approaches.")
             render_swiss_table(
                 get_layer_rows(nn_reg),
                 columns=["Layer", "Type", "Units", "Activation", "Dropout", "Params"],
+                table_class="swiss-table swiss-table-nn",
             )
 
-        # with col2:
-        #     st.caption("**Table 4.** The layers employed in the classification Neural Network model.")
-        #     render_swiss_table(
-        #         get_layer_rows(nn_clf),
-        #         columns=["Layer", "Type", "Units", "Activation", "Dropout", "Params"],
-        #     )
+    if 'shap_nn_reg' in fore_metadata:
+        st.space('small')
+        st.markdown("""
+                    Neural networks are typically opaque, but SHAP (via gradient-based attribution) can reveal which features have the highest impact on the network's prediction.  
+                    Table 5 below presents the absolute SHAP value averaged across all test set predictions, for the regression neural network under the forecasting approach.
+                    """)
+        st.caption("**Table 5.** The top 10 features ranked by absolute SHAP value for the regression neural network under the forecasting approach.")
+        _shap_importance_table(fore_metadata['shap_nn_reg'])
 
 except Exception as exc:
     st.error("Failed to render Neural Network architecture.")

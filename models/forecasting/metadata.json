@@ -7,7 +7,6 @@
     "airline_Rex Airlines",
     "airline_Tigerair Australia",
     "airline_Virgin Australia",
-    "airline_Virgin Australia Regional Airlines",
     "route_Adelaide_Brisbane",
     "route_Adelaide_Melbourne",
     "route_Adelaide_Perth",
@@ -45,8 +44,7 @@
     "airline_Regional Express",
     "airline_Rex Airlines",
     "airline_Tigerair Australia",
-    "airline_Virgin Australia",
-    "airline_Virgin Australia Regional Airlines"
+    "airline_Virgin Australia"
   ],
   "route_cols": [
     "route_Adelaide_Brisbane",
@@ -82,9 +80,9 @@
       "MAE": 0.060279354303811795
     },
     "rf_reg": {
-      "R2": 0.5052318971156655,
-      "RMSE": 0.08130449070066591,
-      "MAE": 0.05967100810578367
+      "R2": 0.5051619958852849,
+      "RMSE": 0.0813102338793205,
+      "MAE": 0.05967037204262469
     },
     "logreg": {
       "F1": 0.714968152866242,
@@ -93,10 +91,10 @@
       "Recall": 0.6622418879056047
     },
     "rf_clf": {
-      "F1": 0.7247058823529412,
-      "AUC": 0.8651899633933966,
-      "Precision": 0.7738693467336684,
-      "Recall": 0.6814159292035398
+      "F1": 0.7320872274143302,
+      "AUC": 0.8663574652592672,
+      "Precision": 0.7755775577557755,
+      "Recall": 0.6932153392330384
     },
     "xgb_clf": {
       "F1": 0.7449513836948392,
@@ -105,242 +103,240 @@
       "Recall": 0.7345132743362832
     },
     "nn_reg": {
-      "R2": 0.5096086006163394,
-      "RMSE": 0.08094408337352284,
-      "MAE": 0.06005091801593818
+      "R2": 0.5134262362977988,
+      "RMSE": 0.08062839800006094,
+      "MAE": 0.059374507395590484
     },
     "nn_clf": {
-      "F1": 0.7686116700201208,
-      "AUC": 0.861140135764296,
-      "Precision": 0.7047970479704797,
-      "Recall": 0.8451327433628318
+      "F1": 0.759526938239159,
+      "AUC": 0.8566176209261827,
+      "Precision": 0.6848341232227488,
+      "Recall": 0.8525073746312685
     }
   },
   "route_metrics": {
     "Adelaide_Brisbane": {
-      "ridge_r2": 0.34132291904652334,
-      "rf_r2": 0.2514699413764979,
+      "ridge_r2": 0.3413229190465231,
+      "rf_r2": 0.2514581858106163,
       "lag1_r2": 0.4495555440550887,
       "n_samples": 53,
-      "nn_r2": 0.3281129155296312
+      "nn_r2": 0.31836331056063116
     },
     "Adelaide_Melbourne": {
-      "ridge_r2": 0.48258086625428165,
-      "rf_r2": 0.5126582850845165,
+      "ridge_r2": 0.48258086625428154,
+      "rf_r2": 0.5121222816580411,
       "lag1_r2": 0.27591070520952776,
       "n_samples": 84,
-      "nn_r2": 0.5372768232353412
+      "nn_r2": 0.5196204109722
     },
     "Adelaide_Perth": {
-      "ridge_r2": 0.6421229265034878,
-      "rf_r2": 0.6180574973556546,
+      "ridge_r2": 0.6421229265034879,
+      "rf_r2": 0.618201382134747,
       "lag1_r2": 0.4912423744284562,
       "n_samples": 48,
-      "nn_r2": 0.6516045371669148
+      "nn_r2": 0.6090358913171899
     },
     "Brisbane_Adelaide": {
-      "ridge_r2": 0.24769243096483085,
-      "rf_r2": 0.31482852472615397,
+      "ridge_r2": 0.24769243096483096,
+      "rf_r2": 0.3148755786505928,
       "lag1_r2": -0.15625918630230196,
       "n_samples": 53,
-      "nn_r2": 0.3179028135391644
+      "nn_r2": 0.3231204025509151
     },
     "Brisbane_Melbourne": {
-      "ridge_r2": 0.41547841803842245,
-      "rf_r2": 0.441081058906011,
+      "ridge_r2": 0.41547841803842256,
+      "rf_r2": 0.44104746512516657,
       "lag1_r2": 0.13745865907822452,
       "n_samples": 100,
-      "nn_r2": 0.5121423177266471
+      "nn_r2": 0.5038305221182098
     },
     "Brisbane_Perth": {
-      "ridge_r2": 0.34445434529533947,
-      "rf_r2": 0.4672766748758129,
+      "ridge_r2": 0.3444543452953398,
+      "rf_r2": 0.4673050327818665,
       "lag1_r2": -0.059609035870329175,
       "n_samples": 48,
-      "nn_r2": 0.4146164441760589
+      "nn_r2": 0.4101395633583439
     },
     "Brisbane_Sydney": {
       "ridge_r2": 0.5195421214628144,
-      "rf_r2": 0.6000262882536125,
+      "rf_r2": 0.600111974135219,
       "lag1_r2": 0.33900340839063303,
       "n_samples": 84,
-      "nn_r2": 0.5455343752562362
+      "nn_r2": 0.576718355945866
     },
     "Hobart_Melbourne": {
       "ridge_r2": 0.49293368819058436,
-      "rf_r2": 0.4753891548199173,
+      "rf_r2": 0.47571331157612606,
       "lag1_r2": 0.36730744337484156,
       "n_samples": 78,
-      "nn_r2": 0.4988640087331584
+      "nn_r2": 0.5197909818074467
     },
     "Hobart_Sydney": {
-      "ridge_r2": 0.4492362430440968,
-      "rf_r2": 0.4551045197484447,
+      "ridge_r2": 0.44923624304409693,
+      "rf_r2": 0.45514455343060056,
       "lag1_r2": 0.1647587536302657,
       "n_samples": 70,
-      "nn_r2": 0.3628765398630097
+      "nn_r2": 0.4160908814354881
     },
     "Melbourne_Adelaide": {
-      "ridge_r2": 0.4878712878893393,
-      "rf_r2": 0.5296999052093534,
+      "ridge_r2": 0.4878712878893394,
+      "rf_r2": 0.52951714694618,
       "lag1_r2": 0.2586124703502797,
       "n_samples": 84,
-      "nn_r2": 0.5165985271409679
+      "nn_r2": 0.5041232224947996
     },
     "Melbourne_Brisbane": {
       "ridge_r2": 0.32105270669814634,
-      "rf_r2": 0.3578455704020014,
+      "rf_r2": 0.3579436225783773,
       "lag1_r2": -0.016392526587895473,
       "n_samples": 100,
-      "nn_r2": 0.3632140707936655
+      "nn_r2": 0.3077358722665179
     },
     "Melbourne_Perth": {
-      "ridge_r2": 0.44604239146580926,
-      "rf_r2": 0.4881261767418106,
+      "ridge_r2": 0.4460423914658094,
+      "rf_r2": 0.488268196158544,
       "lag1_r2": 0.24946513517998337,
       "n_samples": 84,
-      "nn_r2": 0.4712304029704648
+      "nn_r2": 0.4811724062579076
     },
     "Melbourne_Sydney": {
-      "ridge_r2": 0.5797987880888771,
-      "rf_r2": 0.5750452871492469,
+      "ridge_r2": 0.579798788088877,
+      "rf_r2": 0.5751815376016696,
       "lag1_r2": 0.42640797428803634,
       "n_samples": 84,
-      "nn_r2": 0.428045561201996
+      "nn_r2": 0.5199737724957123
     },
     "Perth_Adelaide": {
-      "ridge_r2": 0.2899618931112583,
-      "rf_r2": 0.057140832319961254,
+      "ridge_r2": 0.2899618931112582,
+      "rf_r2": 0.0567624011630532,
       "lag1_r2": 0.05168382780326086,
       "n_samples": 48,
-      "nn_r2": 0.3477360189920615
+      "nn_r2": 0.2990041178493218
     },
     "Perth_Melbourne": {
       "ridge_r2": 0.33692828429045685,
-      "rf_r2": 0.35616167549251676,
+      "rf_r2": 0.3552253419430388,
       "lag1_r2": 0.12028618067934793,
       "n_samples": 84,
-      "nn_r2": 0.3463973339839914
+      "nn_r2": 0.3782350055855679
     },
     "Perth_Sydney": {
-      "ridge_r2": 0.5176274244013009,
-      "rf_r2": 0.507247056407782,
+      "ridge_r2": 0.5176274244013008,
+      "rf_r2": 0.5075311287297901,
       "lag1_r2": 0.3080068403923105,
       "n_samples": 48,
-      "nn_r2": 0.5046830809958358
+      "nn_r2": 0.5057801712273231
     },
     "Sydney_Adelaide": {
       "ridge_r2": 0.38927288459645404,
-      "rf_r2": 0.4342386656158248,
+      "rf_r2": 0.43470449972319747,
       "lag1_r2": 0.06771647894815391,
       "n_samples": 72,
-      "nn_r2": 0.38800351639886577
+      "nn_r2": 0.3810443170535144
     },
     "Sydney_Brisbane": {
-      "ridge_r2": 0.3586685503802929,
-      "rf_r2": 0.235800478616216,
+      "ridge_r2": 0.358668550380293,
+      "rf_r2": 0.2346870175737492,
       "lag1_r2": -0.05297836153752411,
       "n_samples": 84,
-      "nn_r2": 0.2979213028823773
+      "nn_r2": 0.27904043607414575
     },
     "Sydney_Hobart": {
-      "ridge_r2": 0.5426094175953501,
-      "rf_r2": 0.5728996435448962,
+      "ridge_r2": 0.54260941759535,
+      "rf_r2": 0.5726374620520798,
       "lag1_r2": 0.5169794866177337,
       "n_samples": 70,
-      "nn_r2": 0.5161651336392393
+      "nn_r2": 0.5395703655910213
     },
     "Sydney_Melbourne": {
       "ridge_r2": 0.6214670340858632,
-      "rf_r2": 0.620455754627036,
+      "rf_r2": 0.6195879390401559,
       "lag1_r2": 0.48340145374643084,
       "n_samples": 84,
-      "nn_r2": 0.6154919795238238
+      "nn_r2": 0.6503074492093377
     },
     "Sydney_Perth": {
       "ridge_r2": 0.39116405799187903,
-      "rf_r2": 0.3968310368348529,
+      "rf_r2": 0.39675178994990035,
       "lag1_r2": 0.08741783102901046,
       "n_samples": 48,
-      "nn_r2": 0.44075343514994636
+      "nn_r2": 0.49028584405544706
     }
   },
   "feature_importance": {
-    "airline_Jetstar": 0.005951582267886714,
-    "airline_Qantas": 0.002650685089902914,
-    "airline_QantasLink": 0.0003692928895924475,
+    "airline_Jetstar": 0.005949134339419929,
+    "airline_Qantas": 0.002637771160547949,
+    "airline_QantasLink": 0.00036929288959248346,
     "airline_Regional Express": 0.0,
-    "airline_Rex Airlines": 0.00064782132912661,
-    "airline_Tigerair Australia": 0.003021077703451042,
-    "airline_Virgin Australia": 0.005146729179612615,
-    "airline_Virgin Australia Regional Airlines": 0.0,
-    "route_Adelaide_Brisbane": 0.00024185099462325282,
-    "route_Adelaide_Melbourne": 0.0003134699964723239,
-    "route_Adelaide_Perth": 0.0005364018372467729,
-    "route_Brisbane_Adelaide": 0.0004380657223900803,
-    "route_Brisbane_Melbourne": 0.00046905870217375003,
-    "route_Brisbane_Perth": 0.0032607893024025106,
-    "route_Brisbane_Sydney": 0.0001491129906216488,
-    "route_Hobart_Melbourne": 0.000793209753649382,
-    "route_Hobart_Sydney": 0.0010542265897001326,
-    "route_Melbourne_Adelaide": 0.0004983750453922081,
-    "route_Melbourne_Brisbane": 0.0007561318271699874,
-    "route_Melbourne_Perth": 0.002526670014747123,
-    "route_Melbourne_Sydney": 0.0004327069113096377,
-    "route_Perth_Adelaide": 0.0030171981392790896,
-    "route_Perth_Melbourne": 0.0007264955542990703,
-    "route_Perth_Sydney": 0.0002566392245028404,
-    "route_Sydney_Adelaide": 0.00029036943813658833,
-    "route_Sydney_Brisbane": 0.00030715168563171723,
-    "route_Sydney_Hobart": 0.00043315277536038995,
-    "route_Sydney_Melbourne": 0.0003909799621468359,
-    "route_Sydney_Perth": 0.0015193649438658718,
-    "month_sin": 0.02114886002906576,
-    "month_cos": 0.01829014568211451,
-    "delay_rate_lag1": 0.6810861585098481,
-    "sectors_scheduled": 0.04000793537231521,
-    "delay_rate_lag12": 0.10640486820954961,
-    "delay_rate_gradient": 0.05880338463554871,
-    "n_public_holidays_total": 0.01785650321692939,
-    "pct_school_holiday": 0.02020353447393535
+    "airline_Rex Airlines": 0.0006478213291265428,
+    "airline_Tigerair Australia": 0.003021077703451166,
+    "airline_Virgin Australia": 0.005166100874542949,
+    "route_Adelaide_Brisbane": 0.00024185099462322782,
+    "route_Adelaide_Melbourne": 0.00031346999647233117,
+    "route_Adelaide_Perth": 0.0005364018372467696,
+    "route_Brisbane_Adelaide": 0.0004380657223900647,
+    "route_Brisbane_Melbourne": 0.00046905870217374385,
+    "route_Brisbane_Perth": 0.0032607893024024425,
+    "route_Brisbane_Sydney": 0.00014911299062165067,
+    "route_Hobart_Melbourne": 0.0007932097536493972,
+    "route_Hobart_Sydney": 0.0010542265897000528,
+    "route_Melbourne_Adelaide": 0.0004983750453921843,
+    "route_Melbourne_Brisbane": 0.0007561318271699975,
+    "route_Melbourne_Perth": 0.0025266700147469536,
+    "route_Melbourne_Sydney": 0.000432706911309639,
+    "route_Perth_Adelaide": 0.003017198139279075,
+    "route_Perth_Melbourne": 0.0007264955542991324,
+    "route_Perth_Sydney": 0.0002566392245028505,
+    "route_Sydney_Adelaide": 0.0002903694381365761,
+    "route_Sydney_Brisbane": 0.00030715168563173186,
+    "route_Sydney_Hobart": 0.0004382802535071695,
+    "route_Sydney_Melbourne": 0.0003909799621468437,
+    "route_Sydney_Perth": 0.0015193649438658544,
+    "month_sin": 0.021115482665537418,
+    "month_cos": 0.018156711988826665,
+    "delay_rate_lag1": 0.681063467601693,
+    "sectors_scheduled": 0.040008418960277146,
+    "delay_rate_lag12": 0.10641981767639246,
+    "delay_rate_gradient": 0.05876426750419843,
+    "n_public_holidays_total": 0.017809051184257914,
+    "pct_school_holiday": 0.02045503523286826
   },
   "ridge_coefficients": {
-    "airline_Jetstar": 0.004870344247697175,
-    "airline_Qantas": -0.004664406760136195,
-    "airline_QantasLink": 0.0013539627463561696,
+    "airline_Jetstar": 0.0048703442476971835,
+    "airline_Qantas": -0.0046644067601362,
+    "airline_QantasLink": 0.001353962746356172,
     "airline_Regional Express": 0.0,
     "airline_Rex Airlines": 0.003117984264817525,
-    "airline_Tigerair Australia": 0.0007952049426503615,
-    "airline_Virgin Australia": -0.0016133909432015224,
-    "airline_Virgin Australia Regional Airlines": 0.0,
-    "route_Adelaide_Brisbane": -0.0019974120861309366,
-    "route_Adelaide_Melbourne": -0.0008815959992940244,
-    "route_Adelaide_Perth": -0.001518881841459056,
-    "route_Brisbane_Adelaide": -0.0013857723958805761,
-    "route_Brisbane_Melbourne": 0.0008433329519278833,
-    "route_Brisbane_Perth": 0.0012597988534270165,
-    "route_Brisbane_Sydney": -0.00010306705958224678,
-    "route_Hobart_Melbourne": 0.0023624738349109775,
-    "route_Hobart_Sydney": 0.0004847392157333553,
-    "route_Melbourne_Adelaide": -0.0003057577806931789,
-    "route_Melbourne_Brisbane": 0.0021449445666557984,
-    "route_Melbourne_Perth": 0.00025953783686476895,
-    "route_Melbourne_Sydney": 0.0005268255090104978,
-    "route_Perth_Adelaide": -0.00297220347925726,
-    "route_Perth_Melbourne": -0.000703958345691946,
-    "route_Perth_Sydney": -0.0006632314691410811,
+    "airline_Tigerair Australia": 0.0007952049426503598,
+    "airline_Virgin Australia": -0.0016133909432015244,
+    "route_Adelaide_Brisbane": -0.0019974120861309414,
+    "route_Adelaide_Melbourne": -0.0008815959992940254,
+    "route_Adelaide_Perth": -0.0015188818414590582,
+    "route_Brisbane_Adelaide": -0.0013857723958805768,
+    "route_Brisbane_Melbourne": 0.0008433329519278861,
+    "route_Brisbane_Perth": 0.001259798853427019,
+    "route_Brisbane_Sydney": -0.00010306705958224328,
+    "route_Hobart_Melbourne": 0.002362473834910982,
+    "route_Hobart_Sydney": 0.0004847392157333557,
+    "route_Melbourne_Adelaide": -0.0003057577806931803,
+    "route_Melbourne_Brisbane": 0.002144944566655803,
+    "route_Melbourne_Perth": 0.0002595378368647712,
+    "route_Melbourne_Sydney": 0.0005268255090105034,
+    "route_Perth_Adelaide": -0.002972203479257263,
+    "route_Perth_Melbourne": -0.0007039583456919453,
+    "route_Perth_Sydney": -0.0006632314691410821,
     "route_Sydney_Adelaide": -0.0007060945646334265,
-    "route_Sydney_Brisbane": 0.0009216858901406281,
-    "route_Sydney_Hobart": -0.0023941948239692887,
-    "route_Sydney_Melbourne": 0.0010939520666057338,
-    "route_Sydney_Perth": 0.002066736398283074,
-    "month_sin": -0.002897864146117816,
-    "month_cos": -0.0003586403558139257,
-    "delay_rate_lag1": 0.06681874304860852,
-    "sectors_scheduled": 0.001093177925114686,
-    "delay_rate_lag12": 0.02083311044468005,
-    "delay_rate_gradient": -0.011791018736520293,
-    "n_public_holidays_total": -0.003168470171194864,
+    "route_Sydney_Brisbane": 0.000921685890140633,
+    "route_Sydney_Hobart": -0.0023941948239692952,
+    "route_Sydney_Melbourne": 0.001093952066605741,
+    "route_Sydney_Perth": 0.002066736398283078,
+    "month_sin": -0.0028978641461178184,
+    "month_cos": -0.0003586403558139221,
+    "delay_rate_lag1": 0.06681874304860848,
+    "sectors_scheduled": 0.0010931779251146796,
+    "delay_rate_lag12": 0.020833110444680062,
+    "delay_rate_gradient": -0.01179101873652028,
+    "n_public_holidays_total": -0.003168470171194862,
     "pct_school_holiday": -0.0027670049224595918
   },
   "baseline_lag1_r2": 0.30738816460441654,
@@ -465,5 +461,81 @@
     "Virgin Australia_Sydney_Hobart",
     "Virgin Australia_Sydney_Melbourne",
     "Virgin Australia_Sydney_Perth"
-  ]
+  ],
+  "shap_xgb_clf": {
+    "airline_Jetstar": 0.059361279010772705,
+    "airline_Qantas": 0.0783979520201683,
+    "airline_QantasLink": 0.01179560087621212,
+    "airline_Regional Express": 0.0,
+    "airline_Rex Airlines": 0.009069918654859066,
+    "airline_Tigerair Australia": 0.017084816470742226,
+    "airline_Virgin Australia": 0.030643455684185028,
+    "route_Adelaide_Brisbane": 0.005443993490189314,
+    "route_Adelaide_Melbourne": 0.0,
+    "route_Adelaide_Perth": 0.0,
+    "route_Brisbane_Adelaide": 0.0,
+    "route_Brisbane_Melbourne": 0.0011534601217135787,
+    "route_Brisbane_Perth": 0.010344953276216984,
+    "route_Brisbane_Sydney": 0.002438869560137391,
+    "route_Hobart_Melbourne": 0.007800593040883541,
+    "route_Hobart_Sydney": 0.012100647203624249,
+    "route_Melbourne_Adelaide": 0.009386646561324596,
+    "route_Melbourne_Brisbane": 0.0019988466519862413,
+    "route_Melbourne_Perth": 0.014512518420815468,
+    "route_Melbourne_Sydney": 0.004207021556794643,
+    "route_Perth_Adelaide": 0.022433670237660408,
+    "route_Perth_Melbourne": 0.005668014753609896,
+    "route_Perth_Sydney": 0.004580581560730934,
+    "route_Sydney_Adelaide": 0.0,
+    "route_Sydney_Brisbane": 0.007434993050992489,
+    "route_Sydney_Hobart": 0.014168411493301392,
+    "route_Sydney_Melbourne": 0.0008833587635308504,
+    "route_Sydney_Perth": 0.009648588486015797,
+    "month_sin": 0.1887919157743454,
+    "month_cos": 0.11447510123252869,
+    "delay_rate_lag1": 1.486997127532959,
+    "sectors_scheduled": 0.20180989801883698,
+    "delay_rate_lag12": 0.3931823968887329,
+    "delay_rate_gradient": 0.2504642605781555,
+    "n_public_holidays_total": 0.113645039498806,
+    "pct_school_holiday": 0.09735885262489319
+  },
+  "shap_nn_reg": {
+    "airline_Jetstar": 0.0028742664888441213,
+    "airline_Qantas": 0.00386181416189266,
+    "airline_QantasLink": 0.0017822950883453967,
+    "airline_Regional Express": 0.0,
+    "airline_Rex Airlines": 0.0002936984589927092,
+    "airline_Tigerair Australia": 0.001185347232563532,
+    "airline_Virgin Australia": 0.0024562089177914033,
+    "route_Adelaide_Brisbane": 0.0011984794261891585,
+    "route_Adelaide_Melbourne": 0.0018394868324429687,
+    "route_Adelaide_Perth": 0.0007797820536584104,
+    "route_Brisbane_Adelaide": 0.001011904674918769,
+    "route_Brisbane_Melbourne": 0.0016698786254023333,
+    "route_Brisbane_Perth": 0.0007920504340223695,
+    "route_Brisbane_Sydney": 0.001615692755411204,
+    "route_Hobart_Melbourne": 0.0021499374875762122,
+    "route_Hobart_Sydney": 0.0012697818549648927,
+    "route_Melbourne_Adelaide": 0.0009020520023646481,
+    "route_Melbourne_Brisbane": 0.0030956962767011245,
+    "route_Melbourne_Perth": 0.0008515581121683273,
+    "route_Melbourne_Sydney": 0.0024322946050962,
+    "route_Perth_Adelaide": 0.001166086899519299,
+    "route_Perth_Melbourne": 0.001675390872325257,
+    "route_Perth_Sydney": 0.0010839849183617654,
+    "route_Sydney_Adelaide": 0.0008322794839848728,
+    "route_Sydney_Brisbane": 0.0018015206593301944,
+    "route_Sydney_Hobart": 0.0014354629311739925,
+    "route_Sydney_Melbourne": 0.0020152546339705676,
+    "route_Sydney_Perth": 0.0013021345195876567,
+    "month_sin": 0.003827374475195246,
+    "month_cos": 0.00452146901109842,
+    "delay_rate_lag1": 0.05902392405213666,
+    "sectors_scheduled": 0.0016722691430450746,
+    "delay_rate_lag12": 0.011825542140443224,
+    "delay_rate_gradient": 0.010142625138930321,
+    "n_public_holidays_total": 0.0034060826720375354,
+    "pct_school_holiday": 0.006918555732953291
+  }
 }
