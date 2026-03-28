@@ -1,7 +1,6 @@
 """
 Interactive prediction page.
-Users select route, airline, and a specific year-month to get delay rate predictions
-from all models and compare them against actual observed values.
+Users select route, airline, and a specific year-month to get delay rate predictions from all models and compare them against actual observed values.
 """
 
 import sys
@@ -14,7 +13,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 # Import necessary functions from source code
-from src.data_loader import load_metadata, load_models, load_training_data
+from src.data_loader import load_metadata, load_models, load_training_data, NOWCASTING_MODELS_DIR
 from src.ui_theme import apply_theme
 from src.feature_engineering import (
     add_derived_columns,
@@ -80,10 +79,10 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-st.title("NOWCASTING")
+st.title("Nowcasting Models")
 st.markdown(
     """
-    NOWCASTING predicts the delay rate by using real-time data (i.e. up to and including the selected month itself) and therefore cannot predict ahead of time.
+    The nowcasting models predict the delay rate by using real-time data (i.e. up to and including the selected month itself) and therefore cannot predict ahead of time.
 
     For example: when data is available up to February 2026, Nowcasting prediction is only available up to February 2026.
     """
@@ -95,8 +94,20 @@ st.markdown(
 # Streamlit re-runs the entire script with every interaction (any click, dropdown, slider, etc.)
 # To avoid re-loading the models and data with every user action, caching is used.
 @st.cache_resource
-def get_models():
-    return load_models()
+def get_fast_models():
+    import joblib
+    files = {
+        'scaler': 'scaler.pkl',
+        'ridge': 'ridge_regressor.pkl',
+        'logreg': 'logreg_classifier.pkl',
+        'xgb_clf': 'xgb_classifier.pkl',
+    }
+    return {k: joblib.load(os.path.join(NOWCASTING_MODELS_DIR, f)) for k, f in files.items()}
+
+@st.cache_resource
+def get_slow_models():
+    m = load_models()
+    return {k: m[k] for k in ('rf_reg', 'rf_clf', 'nn_reg', 'nn_clf') if k in m}
 
 @st.cache_data
 def get_metadata():
@@ -114,14 +125,9 @@ def get_data():
     return df
 
 
-# Actually load the models and data
-models = get_models()
+# Load metadata and training data eagerly (fast)
 metadata = get_metadata()
 df = get_data()
-
-# Check which models are available
-has_nn = 'nn_reg' in models and 'nn_clf' in models  # neural network
-has_xgb = 'xgb_clf' in models                       # XGBoost
 
 # --- Input Selection ---
 st.divider()
@@ -259,6 +265,13 @@ feature_values['pct_school_holiday'] = row['pct_school_holiday']
 X = np.array([[feature_values[f] for f in feature_names]])
 
 
+
+# --- Load models ---
+with st.spinner("Loading models..."):
+    models = {**get_fast_models(), **get_slow_models()}
+
+has_nn = 'nn_reg' in models and 'nn_clf' in models  # neural network
+has_xgb = 'xgb_clf' in models                       # XGBoost
 
 # --- Start prediction (nowcasting) ---
 scaler = models['scaler']

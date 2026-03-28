@@ -60,7 +60,7 @@ def get_metadata():
 try:
     metadata = get_metadata()
 except FileNotFoundError:
-    st.error("Model artifacts not found. Run `python -m src.train_and_save` first.")
+    st.error("Model artefacts not found. Run `python -m src.train_and_save` first.")
     st.stop()
 
 # Display title
@@ -93,37 +93,37 @@ st.space('small')
 
 st.subheader('What')
 st.markdown("""            
-            Project FLAPS is designed to be a proof-of-concept model to test the feasibility of using machine learning models in predicting the delay rates on Australian domestic flight routes.  
+            Project FLAPS is a proof-of-concept that tests the feasibility of using machine learning to predict delay rates on Australian domestic flight routes.  
             It uses historical data on flight performance and weather observations for training purposes.  
             Historical data for daily weather observations published by the Bureau of Meteorology ([BOM](http://www.bom.gov.au/)) are free and publicly accessible.
 
-            However, historical data for daily flight performance need to be purchased and they are expensive (e.g. from Airservices Australia or Flightradar24). 
+            However, historical data for daily flight performance must be purchased and are expensive (e.g. from Airservices Australia or Flightradar24). 
             To overcome this issue of high costs and data availability, the free _monthly_ flight performance data published by the Bureau of Infrastructure and Transport Research Economics ([BITRE](https://www.bitre.gov.au/)) are used.  
             The implication is that only _monthly_ delay rates can be predicted, not _daily_ delay rates.
 
-            Nonetheless, if decent predictions can be made for monthly delay rates, it is assumed that accurate predictions can also be made for daily delay rates (with some modifications) if access to historical data for daily flight performance is available (e.g. through the usage of proprietary or purchased data).
+            Nonetheless, if decent predictions can be made for monthly delay rates, it is assumed that accurate predictions can also be made for daily delay rates with some modifications. This would require access to historical data for daily flight performance (e.g. from proprietary or purchased sources).
             """)
 st.space('small')
 
 ##
 st.subheader('How')
 st.markdown("""  
-            Based on the above, Project FLAPS set out to build machine learning models to predict the monthly delay rates on Australian domestic flight routes, as a proof-of-concept.
+            Based on the above, Project FLAPS sets out to build machine learning models to predict the monthly delay rates on Australian domestic flight routes, as a proof-of-concept.
             """)
 # st.space('small')
 # st.markdown("  \n")
 st.markdown("##### General")
 st.markdown("""
             Firstly, 7 machine learning models were selected based on their level of complexity, consisting of:
-            - 3 regression models – Ridge, Random Forest and Neural Network – used to predict the monthly delay rate [(i.e. the percentage of delayed flights in the month)].
-            - 4 classification models – Logistic, Random Forest, XGBoost and Neural Network – used to predict if the next month will be a high delay month (defined as >25% of delayed flights in the month).
+            - 3 regression models – Ridge, Random Forest and Neural Network – used to predict the monthly delay rate (i.e. the percentage of delayed flights in the month).
+            - 4 classification models – Logistic, Random Forest, XGBoost and Neural Network – used to predict whether the next month will be a high delay month (defined as >25% of delayed flights in the month).
 
-            The simpler and more interpretable models were used as a starting point, before progressing with more complex models, which may yield better accuracy but were less interpretable.  
+            The simpler and more interpretable models were used as a starting point, before progressing with more complex models, which might yield better accuracy but are less interpretable.  
             All 7 machine learning models were trained (including validation and testing) on a dataset spanning more than 15 years of data (2010-2026, excluding the COVID period) from the BOM and BITRE.
 
             Secondly, feature selection and engineering were performed using a hypothesis testing approach.  
             Potential features with high correlation with the target value (i.e. the monthly delay rate) were first selected.  
-            Each potential feature was then tested individually to ascertain its impact to the model performance.  
+            Each potential feature was then tested individually to ascertain its impact on model performance.  
             It was retained if there was measurable improvement, otherwise it was omitted.
             """)
 #Each potential feature was tested in isolation and retained only when a measurable improvement was observed.
@@ -131,29 +131,29 @@ st.markdown("""
 st.markdown("  \n")
 st.markdown("##### Data Complications")
 st.markdown("""
-            Towards the latter part of the development Project FLAPS, it was discovered that the monthly flight performance data published by BITRE lacked timeliness for the purposes of this project.  
+            Towards the latter part of the development of Project FLAPS, it was discovered that the monthly flight performance data published by BITRE lacked timeliness for the purposes of this project.  
             The data for a certain month is typically released by BITRE towards the end of the following month (e.g. the monthly flight performance data for January 2026 was only released on 20 February 2026).  
             Such timing made it difficult to make a meaningful forecast for the month ahead.
 
-            Thus, the following two-part approach is developed:  
+            Thus, the following two-part approach was developed:  
             1. **Nowcasting approach** 
                 - The purpose of this approach is to aid with model selection and identification of dominant features.  
                 - No forecast will be made for the current month.
                 - This approach uses real-time data (i.e. applying the model to a completed month using that month's own data, rather than predicting ahead) and thus is only applicable to previous months where data is available.
-                - Accordingly, each of the 7 machine learning models will utilise data up until the previous month to provide insight on the previous month's flight delays.
+                - Accordingly, each of the 7 machine learning models will utilise data up to and including the previous month to provide insight on the previous month's flight delays.
                 - For example: each model uses data up until January 2026 to _provide insight on_ January 2026's delays itself.
             2. **Forecasting approach**
                 - The purpose of this approach is to use data up until the previous month to forecast the flight delay rate for the current month.
                 - A forecast is made for the current month.
-                - However, due to the aforementioned delayed publication of data by BITRE, such forecast will typically only be available towards the end of the current month.  
+                - However, due to the aforementioned delayed publication of data by BITRE, such a forecast will typically only be available towards the end of the current month.  
                     For example: each model uses January 2026 data to predict February 2026 delays, if using data published by BITRE, the forecast would only be available from 20 February 2026.  
                 - To address the lack of timeliness in using the data published by BITRE, an additional source of monthly flight performance data is obtained from the [Flightera Flight Data API](https://rapidapi.com/flightera/api/flightera-flight-data), which is available immediately after the month has ended.  
                     For example: each model uses January 2026 data to predict February 2026 delays, if using data published by Flightera Flight Data API, the forecast would be available from 1 February 2026.
             
             Integrating the most recent month’s flight performance data from Flightera Flight Data API addresses the timing constraint presented by the BITRE data.  
-            While it is a paid source, fortunately the cost for obtaining such data is relatively low and competitively priced.  
+            While it is a paid source, fortunately the cost of obtaining such data is relatively low.  
             To validate, the delay rates obtained from Flightera and BITRE were compared to make sure they are consistent.  
-            This was confirmed by comparing their delay rates for January 2026, where the reported values for the Sydney to Melbourne route (as a representative sample) from these two sources only differ by less than 2 %.
+            This was confirmed by comparing their delay rates for January 2026, where the reported values for the Sydney to Melbourne route (as a representative sample) from these two sources only differed by less than 2 %.
             """)
 # st.space('xxsmall')
 st.markdown("  \n")
@@ -161,14 +161,14 @@ st.markdown("""
             ##### Best Overall Models
 
             Depending on the approach (nowcasting or forecasting) and the type of prediction (regression or classification), there are three best overall models identified.  
-            Each of these models are briefly described below:
+            Each of these models is briefly described below:
             - For **regression nowcasting**: Ridge.  
                 It is a simple linear model, but the performance is still comparable to the more complex non-linear models.  
-                Although there is a small sacrifice in accuracy, it is worth the trade-off in higher interpretability -- which is a priority in the nowcasting approach.
+                Although there is a small sacrifice in accuracy, it is worth the trade-off in higher interpretability — which is a priority in the nowcasting approach.
             - For both **classification nowcasting** and **forecasting**: XGBoost.  
                 It gives the best balance between precision and recall amongst the other classification models.  
                 As the regression model provided interpretability, the focus here is on achieving a good, balanced performance.  
-                _Good precision_ means when the model predicts a high-delay month, it is likely to be actually a high-delay month.  
+                _Good precision_ means when the model predicts a high-delay month, it is likely to actually be a high-delay month.  
                 _Good recall_ means the model does not miss many actual high-delay months.  
                 When relying solely on good precision, there is a potential risk the model _predicts a high-delay month only when it is very certain_ and misses out on many actual high-delay months.  
                 On the other hand, when relying solely on good recall, there is a potential risk that the model _predicts a high-delay month even when it is not certain_ in order to avoid missing out.  

@@ -18,6 +18,7 @@ from src.data_loader import (
     load_forecasting_models,
     load_load_factor_data,
     load_training_data,
+    FORECASTING_MODELS_DIR,
 )
 from src.ui_theme import apply_theme
 from src.feature_engineering import (
@@ -113,10 +114,10 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-st.title("FORECASTING")
+st.title("Forecasting Models")
 st.markdown(
     """
-    Forecasting predicts the delay rate of the current month, using data up until the month prior (i.e. no real-time data from the selected month is used).
+    The forecasting models predict the delay rate of the current month, using data up until the month prior (i.e. no real-time data from the selected month is used).
 
     For example: when data is available up to February 2026, Forecasting prediction is available up to March 2026.
 
@@ -126,8 +127,20 @@ st.markdown(
 
 
 @st.cache_resource
-def get_models():
-    return load_forecasting_models()
+def get_fast_models():
+    import joblib
+    files = {
+        'scaler': 'scaler.pkl',
+        'ridge': 'ridge_regressor.pkl',
+        'logreg': 'logreg_classifier.pkl',
+        'xgb_clf': 'xgb_classifier.pkl',
+    }
+    return {k: joblib.load(os.path.join(FORECASTING_MODELS_DIR, f)) for k, f in files.items()}
+
+@st.cache_resource
+def get_slow_models():
+    m = load_forecasting_models()
+    return {k: m[k] for k in ('rf_reg', 'rf_clf', 'nn_reg', 'nn_clf') if k in m}
 
 
 @st.cache_data
@@ -166,9 +179,8 @@ def get_data():
     return df
 
 
-# Load
+# Load metadata and training data eagerly (fast)
 try:
-    models = get_models()
     metadata = get_metadata()
 except FileNotFoundError:
     st.error(
@@ -178,10 +190,6 @@ except FileNotFoundError:
     st.stop()
 
 df = get_data()
-
-# Check which models are available
-has_xgb = 'xgb_clf' in models
-has_nn = 'nn_reg' in models and 'nn_clf' in models
 
 # Route/airline data setup
 valid_routes = metadata['valid_routes']
@@ -337,6 +345,13 @@ if len(ar_with_lags) == 0:
     st.stop()
 
 st.markdown(f"Latest available data: **{latest_dt.strftime('%B %Y')}**")
+
+# ── Load models ──
+with st.spinner("Loading models..."):
+    models = {**get_fast_models(), **get_slow_models()}
+
+has_xgb = 'xgb_clf' in models
+has_nn = 'nn_reg' in models and 'nn_clf' in models
 
 # ── Feature extraction (branches on future vs past) ──
 is_future = (pd.Timestamp(selected_dt) == next_month_dt)
