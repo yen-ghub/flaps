@@ -119,6 +119,13 @@ apply_theme(
     /* NN layer table (Table 4) — override Units and Params column widths */
     .swiss-table-nn th:nth-child(3), .swiss-table-nn td:nth-child(3) { width: 80px; }
     .swiss-table-nn th:nth-child(6), .swiss-table-nn td:nth-child(6) { width: 80px; }
+    /* Mobile: enable horizontal scrolling for tables */
+    @media (max-width: 768px) {
+        .swiss-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+    }
     """
 )
 st.title("Model Details")
@@ -595,8 +602,8 @@ try:
     if 'shap_xgb_clf' in now_metadata or 'shap_xgb_clf' in fore_metadata:
         st.space('small')
         st.markdown("""
-                    Unlike Ridge regression, the XGBoost model does not have a single weight value for each feature.  
-                    Thus, the SHAP (SHapley Additive exPlanations) method was used to decompose each prediction into a baseline value plus the contribution values made by each input feature.  
+                    Unlike Ridge regression, the XGBoost model does not have a single weight value for each feature that quantifies its importance.  
+                    Thus, the Tree SHAP (SHapley Additive exPlanations) method was used to decompose each prediction using XGBoost (an ensemble tree model) into a baseline value plus the contribution values made by each input feature.  
                     These contribution values of each feature are referred to as the SHAP values.  
                     Tables 3a and 3b below show the absolute SHAP value averaged across all test set predictions (which indicate the impact of each feature on the classification decision), for the nowcasting and forecasting XGBoost models, respectively.
                     """
@@ -653,7 +660,8 @@ try:
     if 'shap_nn_reg' in fore_metadata:
         st.space('small')
         st.markdown("""
-                    Neural networks are typically opaque, but SHAP (via gradient-based attribution) can reveal which features have the highest impact on the network's prediction.  
+                    Like XGBoost, it is not feasible to quantify feature importance in a fully connected neural network due to the complex interdependencies among features.
+                    A gradient-based SHAP method is used here to estimate which features have the highest impact on the prediction.  
                     Table 5 below presents the absolute SHAP value averaged across all test set predictions, for the regression neural network under the forecasting approach.
                     """)
         st.caption("**Table 5.** The top 10 features ranked by absolute SHAP value for the regression neural network under the forecasting approach.")

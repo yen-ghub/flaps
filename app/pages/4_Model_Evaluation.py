@@ -30,7 +30,8 @@ apply_theme(
     .swiss-table-wrap {
         border: 0;
         border-radius: 0;
-        overflow: hidden;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
         margin: 0;
         padding: 0;
     }
